@@ -1,0 +1,26 @@
+{
+  "name": "andstar",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=23"
+  },
+  "scripts": {
+    "dev": "vite",
+    "server": "node --no-warnings server/index.mjs",
+    "build": "vite build && vite build --config vite.standalone.config.ts",
+    "check": "tsc --noEmit",
+    "smoke": "vite-node scripts/smoke.ts",
+    "start": "node --no-warnings server/index.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-node": "^6.0.0"
+  }
+}

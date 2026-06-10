@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "voicebox",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--no-warnings", "server/index.mjs"],
+      "port": 8787,
+      "autoPort": true
+    }
+  ]
+}
