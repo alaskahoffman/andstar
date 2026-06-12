@@ -12,6 +12,8 @@ function pageRoutes(): Plugin {
           req.url = "/play.html";
         } else if (req.url && /^\/create\/?(\?|$)/.test(req.url)) {
           req.url = "/create.html";
+        } else if (req.url && /^\/docs\/?(\?|$)/.test(req.url)) {
+          req.url = "/docs.html";
         }
         next();
       });
@@ -27,6 +29,7 @@ export default defineConfig({
         home: resolve(__dirname, "index.html"),
         create: resolve(__dirname, "create.html"),
         play: resolve(__dirname, "play.html"),
+        docs: resolve(__dirname, "docs.html"),
       },
     },
   },

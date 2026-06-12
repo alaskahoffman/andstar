@@ -38,6 +38,7 @@ export function parseGame(source: string): ParseResult {
     theme: {},
     points: null,
     wardrobe: false,
+    reveal: "click",
     currency: null,
     fails: [],
     skills: {},
@@ -104,6 +105,15 @@ export function parseGame(source: string): ParseResult {
       }
       if (decl.startsWith("@points")) { err(ln, `bad @points — expected: @points 6  (optionally: @points 6 max 6)`); continue; }
       if ((m = decl.match(/^@wardrobe\s+(open|locked)\s*$/))) { game.wardrobe = m[1] === "open"; continue; }
+      if ((m = decl.match(/^@reveal\s+(\S+)\s*$/))) {
+        const v = m[1].toLowerCase();
+        if (v !== "click" && v !== "paced" && v !== "off") {
+          err(ln, `@reveal must be click (default: tap for each line), paced (timed), or off`);
+          continue;
+        }
+        game.reveal = v;
+        continue;
+      }
       if (decl.startsWith("@wardrobe")) { err(ln, `bad @wardrobe — expected: @wardrobe open  or  @wardrobe locked`); continue; }
       if ((m = decl.match(/^@(bg|accent)\s+(\S+)\s*$/))) {
         if (!/^#[0-9a-fA-F]{6}$/.test(m[2])) { err(ln, `@${m[1]} needs a 6-digit hex color, e.g. @${m[1]} #1a2030`); continue; }
@@ -338,13 +348,19 @@ export function parseGame(source: string): ParseResult {
         const amount = parseInt(m[1], 10);
         if (amount < 1) { err(ln, `~ points needs a positive number of skill points`); continue; }
         effect = { kind: "points", amount };
+      } else if ((m = body.match(/^skill\s+([A-Za-z_]\w*)\s*([+-]\d+)\s*$/))) {
+        const skill = m[1].toLowerCase();
+        const amount = parseInt(m[2], 10);
+        if (!game.skills[skill]) { err(ln, `unknown skill "${m[1]}" — ~ skill changes a declared skill, e.g. ~ skill sangfroid -1`); continue; }
+        if (amount === 0) { err(ln, `~ skill needs a non-zero change, e.g. ~ skill ${skill} +1`); continue; }
+        effect = { kind: "skillmod", skill, amount };
       } else if ((m = body.match(/^(pay|earn)\s+(.+)$/))) {
         if (!game.currency) { err(ln, `~ ${m[1]} needs a currency — declare one first: currency real "Réal" = 20`); continue; }
         const e = parseCondOrNull(m[2], ln);
         if (!e) continue;
         effect = { kind: m[1] as "pay", expr: e };
       } else {
-        err(ln, `bad effect — expected: ~ set name = expr | ~ give/take/equip/unequip item | ~ pay/earn amount | ~ points 1 | ~ save | ~ wardrobe open/close`);
+        err(ln, `bad effect — expected: ~ set name = expr | ~ give/take/equip/unequip item | ~ pay/earn amount | ~ points 1 | ~ skill name +1 | ~ save | ~ wardrobe open/close`);
         continue;
       }
       passage.steps.push({ kind: "effect", effect, line: ln, ...gate });

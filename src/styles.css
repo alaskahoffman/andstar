@@ -95,6 +95,9 @@ body.home { display: flex; min-height: 100vh; }
   padding: 10px 22px;
   letter-spacing: 0.1em;
 }
+.home-docs { margin: -22px 0 36px; font-size: 13px; }
+.home-docs a { color: var(--fg-dim); text-decoration: underline dotted; text-underline-offset: 3px; }
+.home-docs a:hover { color: var(--accent); }
 .home-footer { color: var(--fg-faint); font-size: 12px; }
 .home-footer p { margin: 0 0 8px; }
 .home-footer a { color: var(--fg-dim); }
@@ -120,6 +123,80 @@ body.home { display: flex; min-height: 100vh; }
   text-align: center;
 }
 .home-privacy.show { animation: fadeline 0.6s ease-out; }
+
+/* ---------- docs ---------- */
+
+body.docs-page { overflow-y: auto; height: auto; }
+.docs-main {
+  max-width: 72ch;
+  margin: 0 auto;
+  padding: 44px 24px 80px;
+}
+.docs-brand { color: var(--accent); display: inline-block; }
+.docs-brand:hover { color: var(--fg-strong); }
+.docs-mark { height: 30px; width: auto; display: block; }
+.docs-h1 {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 14px 0 6px;
+  color: var(--accent);
+}
+.docs-wordmark { height: 24px; width: auto; align-self: center; }
+.docs-h1 span { font-size: 24px; font-weight: 400; color: var(--fg-dim); }
+.docs-sub { color: var(--fg-dim); margin: 0 0 22px; }
+.docs-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 12px 0 8px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 30px;
+  font-size: 13px;
+}
+.docs-toc a { color: var(--fg-dim); text-decoration: none; }
+.docs-toc a:hover { color: var(--accent); }
+.docs-main h2 {
+  font-size: 17px;
+  color: var(--accent);
+  margin: 44px 0 10px;
+  letter-spacing: 0.04em;
+}
+.docs-main h3 { font-size: 14.5px; margin: 0 0 6px; }
+.docs-main p { color: var(--fg); line-height: 1.65; margin: 0 0 12px; }
+.docs-main ul { color: var(--fg); line-height: 1.65; margin: 0 0 12px; padding-left: 22px; }
+.docs-main pre {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 0 0 12px;
+}
+.docs-main code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 0 4px;
+}
+.docs-main pre code { border: none; background: none; padding: 0; }
+.doc-entry {
+  border-left: 2px solid var(--border);
+  padding-left: 16px;
+  margin: 0 0 22px;
+}
+.docs-footer {
+  margin-top: 56px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-faint);
+  font-size: 13px;
+}
+.docs-footer a { color: var(--fg-dim); text-decoration: none; }
+.docs-footer a:hover { color: var(--accent); }
 
 /* ---------- top bar ---------- */
 
@@ -328,15 +405,27 @@ button.item-row:hover .stat-name { color: var(--accent); }
 
 /* ---------- log ---------- */
 
-.log p { margin: 0 0 14px; max-width: 72ch; }
+.log p { margin: 0 0 14px; max-width: 72ch; transition: opacity 0.4s ease; }
+.log p.past { opacity: 0.45; } /* read text recedes; the bright edge is your place */
 .log p.reveal { animation: fadeline 0.5s ease-out; }
+.continue-hint {
+  color: var(--fg-faint);
+  user-select: none;
+  cursor: pointer;
+  animation: hintpulse 1.4s ease-in-out infinite;
+}
+@keyframes hintpulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.9; }
+}
 @keyframes fadeline {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
-.log .narration { color: var(--fg-dim); }
+.log .narration { color: var(--fg); } /* narration is the story, not chrome */
+.log .echo { color: var(--fg-dim); } /* …but your own choice, repeated back, is */
 .log .dialogue .speaker { font-weight: 700; letter-spacing: 0.08em; }
-.log .skill-voice { font-style: italic; }
+.log .skill-voice { font-style: normal; } /* bold colored name carries the voice */
 .log .passive { opacity: 0.95; }
 .log .check-tag { color: var(--fg-faint); font-style: normal; font-size: 12px; }
 .log .sep { color: var(--fg-faint); }
@@ -428,13 +517,27 @@ button.item-row:disabled:hover .stat-name { color: var(--fg); }
   color: var(--fg-strong);
 }
 .choice-num { color: var(--accent); margin-right: 6px; }
-.choice .check-tag { font-size: 12.5px; }
+/* check/cost tags read as chips so the stakes are visible before any hover */
+.choice .check-tag {
+  font-size: 12px;
+  display: inline-block;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  line-height: 1.7;
+}
 .choice .currency-tag { color: var(--accent); }
-/* red checks: the whole hover highlight runs red — one chance, look twice */
+/* red checks: the whole choice is outlined red, always — one chance, look twice */
+.choice.choice-red { border-color: var(--red); }
 .choice.choice-red:hover, .choice.choice-red:active {
   background: rgba(201, 95, 78, 0.16);
   border-color: var(--red);
 }
+/* choices you've already picked run red, DE-style */
+.choice.choice-used, .choice.choice-used .choice-num { color: var(--red); }
+/* a spent [once]: visible, red, dead */
+.choice.choice-spent { cursor: default; }
+.choice.choice-spent:hover { border-color: transparent; background: none; color: var(--red); }
 .choice.choice-locked { opacity: 0.4; cursor: default; }
 .choice.choice-locked:hover { border-color: transparent; background: none; color: var(--fg); }
 .retry-tag { color: var(--fg-faint); font-size: 12px; }

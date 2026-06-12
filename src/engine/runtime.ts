@@ -32,6 +32,10 @@ export type LogEntry =
 export interface VisibleChoice {
   id: string;
   text: string;
+  /** Picked before — renders red, DE-style. */
+  used?: boolean;
+  /** A used [once] choice: still listed, but dead. */
+  locked?: boolean;
   /** [pay]/[earn] tag; locked = can't afford the pay. */
   cost?: { kind: "pay" | "earn"; amount: number; name: string; locked: boolean };
   check?: {
@@ -49,7 +53,9 @@ export interface VisibleChoice {
 
 interface CheckOutcome {
   result: "passed" | "failed";
-  /** Effective skill at the moment of a white-check failure; retry unlocks above it. */
+  /** BASE skill at the moment of a white-check failure. Retries unlock only
+   *  when the skill itself grows past this — equipment affects rolls, but
+   *  re-dressing can't reopen a failed check. */
   atValue: number;
 }
 
@@ -65,9 +71,12 @@ export interface SaveData {
   pendingChoiceIds: string[];
   wardrobeOpen: boolean;
   pendingPoints: number;
-  /** [once] lines already shown (passage#step) and [once] choices already picked. */
+  /** [once] lines already shown (passage#step). */
   firedOnce?: string[];
+  /** Legacy name for chosenEver — older saves only recorded [once] picks. */
   chosenOnce?: string[];
+  /** Every choice id ever picked (used-choice display + [once] locking). */
+  chosenEver?: string[];
   log: LogEntry[];
 }
 
@@ -121,7 +130,7 @@ export class Runtime {
   private equipped = new Set<string>();
   private firedPassives = new Set<string>();
   private firedOnce = new Set<string>(); // [once] lines, keyed passage#step
-  private chosenOnce = new Set<string>(); // [once] choices, by choice id
+  private chosenEver = new Set<string>(); // every picked choice id
   // choice id -> outcome of its check
   private checkState = new Map<string, CheckOutcome>();
   private pendingChoices: Choice[] = [];
@@ -146,7 +155,7 @@ export class Runtime {
       this.equipped = new Set(snap.equipped);
       this.firedPassives = new Set(snap.firedPassives);
       this.firedOnce = new Set(snap.firedOnce ?? []);
-      this.chosenOnce = new Set(snap.chosenOnce ?? []);
+      this.chosenEver = new Set([...(snap.chosenEver ?? []), ...(snap.chosenOnce ?? [])]);
       this.checkState = new Map(Object.entries(snap.checkState));
       this.wardrobeOpen = snap.wardrobeOpen;
       this.pendingPoints = snap.pendingPoints;
@@ -168,9 +177,13 @@ export class Runtime {
     if (this.failed) return [];
     const out: VisibleChoice[] = [];
     for (const c of this.pendingChoices) {
-      if (c.once && this.chosenOnce.has(c.id)) continue;
       if (c.cond && !truthy(this.evalExpr(c.cond))) continue;
+      const used = this.chosenEver.has(c.id);
       const vc: VisibleChoice = { id: c.id, text: this.interpolate(c.text) };
+      if (used) {
+        vc.used = true;
+        if (c.once) vc.locked = true; // stays visible, but dead
+      }
       if (c.cost) {
         const cur = this.game.currency!;
         const balance = Number(this.vars.get(cur.id) ?? 0);
@@ -196,9 +209,8 @@ export class Runtime {
           difficultyLabel: difficultyLabel(c.check.difficulty),
           chance: successChance(bonus, c.check.difficulty),
           failedBefore,
-          // A failed white check stays locked until the skill total improves
-          // past where it failed (skill points or better equipment).
-          locked: failedBefore && bonus <= prior!.atValue,
+          // Locked until the skill itself is upgraded past its fail-time value.
+          locked: failedBefore && this.skillBase(c.check.skill) <= prior!.atValue,
         };
       }
       out.push(vc);
@@ -214,16 +226,16 @@ export class Runtime {
       const prior = this.checkState.get(c.id);
       if (prior?.result === "passed") return;
       if (prior?.result === "failed" &&
-          (c.check.type === "red" || this.effectiveSkill(c.check.skill) <= prior.atValue)) {
+          (c.check.type === "red" || this.skillBase(c.check.skill) <= prior.atValue)) {
         return; // locked
       }
     }
-    if (c.once && this.chosenOnce.has(c.id)) return;
+    if (c.once && this.chosenEver.has(c.id)) return;
     if (c.cost?.kind === "pay" &&
         Number(this.vars.get(this.game.currency!.id) ?? 0) < c.cost.amount) {
       return; // can't afford it
     }
-    if (c.once) this.chosenOnce.add(c.id);
+    this.chosenEver.add(c.id);
     this.log.push({ kind: "narration", text: `» ${this.interpolate(c.text)}` });
     if (c.cost) {
       this.applyEffect({ kind: c.cost.kind, expr: { t: "num", v: c.cost.amount } });
@@ -233,7 +245,7 @@ export class Runtime {
       this.log.push({ kind: "roll", roll });
       this.checkState.set(c.id, {
         result: roll.success ? "passed" : "failed",
-        atValue: this.effectiveSkill(c.check.skill),
+        atValue: this.skillBase(c.check.skill),
       });
       this.enterPassage(roll.success ? c.check.success : c.check.fail);
     } else {
@@ -420,6 +432,15 @@ export class Runtime {
         this.pendingPoints += e.amount;
         this.log.push({ kind: "system", text: `+${e.amount} skill point${e.amount === 1 ? "" : "s"}` });
         break;
+      case "skillmod": {
+        this.vars.set(e.skill, Number(this.vars.get(e.skill) ?? 0) + e.amount);
+        const name = this.game.skills[e.skill]?.name ?? e.skill;
+        this.log.push({
+          kind: "system",
+          text: `${name} ${e.amount > 0 ? "+" : "−"}${Math.abs(e.amount)}`,
+        });
+        break;
+      }
       case "pay":
       case "earn": {
         const cur = this.game.currency;
@@ -467,7 +488,7 @@ export class Runtime {
       wardrobeOpen: this.wardrobeOpen,
       pendingPoints: this.pendingPoints,
       firedOnce: [...this.firedOnce],
-      chosenOnce: [...this.chosenOnce],
+      chosenEver: [...this.chosenEver],
       log: this.log.slice(),
     });
   }

@@ -64,7 +64,9 @@ export type Effect =
   | { kind: "wardrobe"; open: boolean }
   | { kind: "pay" | "earn"; expr: Expr }
   | { kind: "save" }
-  | { kind: "points"; amount: number };
+  | { kind: "points"; amount: number }
+  /** ~ skill sangfroid -1 — author-applied change to a specific skill, logged. */
+  | { kind: "skillmod"; skill: string; amount: number };
 
 // Non-choice steps may carry a line condition ([expr]) and/or [once];
 // the step is skipped when the condition is falsy or it already ran.
@@ -103,6 +105,8 @@ export interface GameDef {
   points: { pool: number; max?: number } | null;
   /** Whether players may freely equip/unequip from the start (default: locked). */
   wardrobe: boolean;
+  /** Line pacing on play pages: tap-per-line (click), timed (paced), or instant (off). */
+  reveal: "click" | "paced" | "off";
   /** Money: a var (id) rendered in the HUD, spent/gained via ~ pay / ~ earn. */
   currency: { id: string; name: string } | null;
   /** Fail rules (@fail expr "msg"): when true after a state change, the run

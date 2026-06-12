@@ -72,6 +72,9 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
   let revealing = false;
   let instantNext = false; // restored logs render at once, not line by line
   const revealQueue: LogEntry[] = [];
+  // Pacing: the author's @reveal setting, honored only where opts.reveal is on
+  // (play pages); the editor preview always renders instantly.
+  const revealMode: "click" | "paced" | "off" = opts.reveal ? game.reveal : "off";
   // Last checkpoint this session — fail states reload it (works in preview too,
   // where nothing is persisted).
   let lastSnap: SaveData | null = null;
@@ -225,7 +228,8 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
   function renderLogEntry(entry: LogEntry): HTMLElement {
     switch (entry.kind) {
       case "narration": {
-        return el("p", "narration", entry.text);
+        // "» ..." lines are the player's own pick echoed back — keep those dim
+        return el("p", entry.text.startsWith("» ") ? "narration echo" : "narration", entry.text);
       }
       case "dialogue": {
         const p = el("p", entry.isSkill ? "dialogue skill-voice" : "dialogue");
@@ -369,7 +373,12 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
         locked = locked || c.check.locked;
       }
       btn.append(el("span", "", `${c.cost || c.check ? "" : " "}${c.text}`));
-      if (locked) {
+      if (c.used) btn.classList.add("choice-used"); // been here before — runs red
+      if (c.locked) {
+        // a spent [once]: visible, red, dead
+        btn.disabled = true;
+        btn.classList.add("choice-spent");
+      } else if (locked) {
         btn.disabled = true;
         btn.classList.add("choice-locked");
       } else if (c.check?.failedBefore) {
@@ -474,27 +483,47 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       revealTimer = null;
     }
     while (revealQueue.length) logEl.append(renderLogEntry(revealQueue.shift()!));
+    dimPast();
     revealing = false;
     finishRender();
   }
 
-  function revealStep(): void {
+  // Everything above the newest line tints down — the bright edge is
+  // the reader's cursor.
+  function dimPast(): void {
+    const kids = logEl.children;
+    for (let i = 0; i < kids.length - 1; i++) kids[i].classList.add("past");
+  }
+
+  // Append one queued entry; finish the render when the queue empties.
+  function revealOne(): void {
     const entry = revealQueue.shift();
     if (entry) {
+      logEl.lastElementChild?.classList.add("past");
       const p = renderLogEntry(entry);
       p.classList.add("reveal");
       logEl.append(p);
       main.scrollTop = main.scrollHeight;
     }
+    if (!revealQueue.length) {
+      revealing = false;
+      finishRender();
+    }
+  }
+
+  function revealStep(): void {
+    revealOne();
     if (revealQueue.length) {
       // chrome lines (item pickups etc.) tick by faster than prose
       const delay = revealQueue[0].kind === "system" ? 450 : 1000;
       revealTimer = window.setTimeout(revealStep, delay);
     } else {
       revealTimer = null;
-      revealing = false;
-      finishRender();
     }
+  }
+
+  function showContinueHint(): void {
+    choicesEl.append(el("p", "continue-hint", "▼"));
   }
 
   function render(): void {
@@ -505,15 +534,22 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     }
     const fresh = rt.log.slice(rendered);
     rendered = rt.log.length;
-    if (!opts.reveal || instantNext || (fresh.length <= 1 && !revealing)) {
+    if (revealMode === "off" || instantNext || (fresh.length <= 1 && !revealing)) {
       instantNext = false;
       for (const e of fresh) logEl.append(renderLogEntry(e));
+      dimPast();
       if (!revealing) finishRender();
       return;
     }
     revealQueue.push(...fresh);
     choicesEl.innerHTML = ""; // choices appear once the prose has arrived
-    if (!revealing) {
+    if (revealMode === "click") {
+      if (!revealing) {
+        revealing = true;
+        revealOne(); // first line lands immediately; the rest wait for taps
+      }
+      if (revealing) showContinueHint();
+    } else if (!revealing) {
       revealing = true;
       revealStep();
     }
@@ -525,6 +561,12 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
 
   function onKey(ev: KeyboardEvent): void {
     if (ev.target instanceof HTMLTextAreaElement || ev.target instanceof HTMLInputElement) return;
+    if (revealing && (ev.key === " " || ev.key === "Enter")) {
+      ev.preventDefault();
+      if (revealMode === "click") revealOne();
+      else flushReveal();
+      return;
+    }
     const n = parseInt(ev.key, 10);
     if (!Number.isNaN(n) && n >= 1) {
       const btns = choicesEl.querySelectorAll<HTMLButtonElement>("button.choice:not(.restart-btn)");
@@ -532,12 +574,14 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     }
   }
   document.addEventListener("keydown", onKey);
-  // tap/click anywhere in the prose to skip the staggered reveal
-  // (ignore the button click that started it, bubbling up)
+  // Tap/click in the prose: in click mode it reveals the next line (DE-style);
+  // in paced mode it skips the rest of the stagger.
+  // (Ignore the button click that started the reveal, bubbling up.)
   main.addEventListener("click", (ev) => {
     if (!revealing) return;
     if ((ev.target as HTMLElement).closest("button, a")) return;
-    flushReveal();
+    if (revealMode === "click") revealOne();
+    else flushReveal();
   });
 
   const existingSave = opts.save?.load() ?? null;

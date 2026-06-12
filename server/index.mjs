@@ -178,6 +178,7 @@ app.get("/play/:id", (req, res) => {
 });
 
 app.get("/create", (_req, res) => res.sendFile(join(dist, "create.html")));
+app.get("/docs", (_req, res) => res.sendFile(join(dist, "docs.html")));
 
 app.use(express.static(dist));
 

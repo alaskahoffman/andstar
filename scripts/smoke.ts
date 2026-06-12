@@ -109,7 +109,8 @@ console.log("\nmechanics:");
   const drink = dawnChoices.find((c) => c.cost?.kind === "pay")!;
   assert(drink.cost!.locked, "drinking greyed out with zero cups of water");
 
-  // White checks lock on failure until the skill total improves; red is one-shot.
+  // White checks lock on failure until the skill ITSELF is upgraded;
+  // equipment affects rolls but cannot reopen a failed check. Red is one-shot.
   const g3 = parseGame(`
 skill a "A" = 0
 item lens "Lens" a+1
@@ -118,22 +119,32 @@ item lens "Lens" a+1
 ~ wardrobe open
 * [white a 30] try -> win | start
 * [red a 30] once -> win | start
+* train -> gym
 * wait -> start
+== gym
+~ skill a +1
+-> start
 == win
 -> END
 `).game!;
   const rt3 = new Runtime(g3, { rng: () => 0.0 }); // always rolls 1+1 = crit fail
   let cs = rt3.getChoices();
-  assert(cs.length === 3, "both checks + filler visible initially");
-  rt3.choose(cs[0].id); // fail white at effective 0
+  assert(cs.length === 4, "both checks + fillers visible initially");
+  rt3.choose(cs[0].id); // fail white at base 0
   cs = rt3.getChoices();
   const white = cs.find((c) => c.check?.type === "white")!;
   assert(white.check!.failedBefore && white.check!.locked, "failed white is locked while skill unchanged");
   rt3.choose(white.id); // locked: must be a no-op
-  assert(rt3.getChoices().length === 3, "choosing a locked check does nothing");
-  rt3.toggleEquip("lens"); // effective 0 -> 1, beats the fail value
+  assert(rt3.getChoices().length === 4, "choosing a locked check does nothing");
+  rt3.toggleEquip("lens"); // effective 0 -> 1, but the BASE skill hasn't grown
+  assert(
+    rt3.getChoices().find((c) => c.check?.type === "white")!.check!.locked,
+    "equipment does NOT reopen a failed white check",
+  );
+  rt3.choose(rt3.getChoices().find((c) => c.text.includes("train"))!.id); // ~ skill a +1
+  assert(rt3.log.some((l) => l.kind === "system" && l.text === "A +1"), "~ skill change is logged");
   const retry = rt3.getChoices().find((c) => c.check?.type === "white")!;
-  assert(!retry.check!.locked && retry.check!.failedBefore, "white unlocks once the skill total improves");
+  assert(!retry.check!.locked && retry.check!.failedBefore, "white unlocks once the skill itself improves");
   rt3.choose(rt3.getChoices().find((c) => c.check?.type === "red")!.id); // fail red
   cs = rt3.getChoices();
   assert(!cs.some((c) => c.check?.type === "red"), "red gone after one attempt");
@@ -321,11 +332,20 @@ You need the key.
   assert(texts().filter((t) => t === "First time only.").length === 1, "[once] line did not repeat on revisit");
   assert(texts().includes("We meet again."), "[met] line appears once true");
   cs = rtL.getChoices();
-  assert(!cs.some((c) => c.text.includes("One shot")), "[once] choice gone after being picked");
+  const oneShot = cs.find((c) => c.text.includes("One shot"))!;
+  assert(oneShot?.used === true && oneShot?.locked === true, "picked [once] stays listed: used + locked");
+  rtL.choose(oneShot.id);
+  assert(rtL.getChoices().some((c) => c.text.includes("One shot")), "choosing a spent [once] is a no-op");
 
   rtL.choose(cs.find((c) => c.text.includes("Composable"))!.id); // +2 gold -> 8
   assert(rtL.statValue("gold") === 8, "[once][earn 2] paid out");
-  assert(!rtL.getChoices().some((c) => c.text.includes("Composable")), "and disappeared after one use");
+  const spentEarn = rtL.getChoices().find((c) => c.text.includes("Composable"))!;
+  assert(spentEarn.locked === true, "and locks after one use");
+  rtL.choose(spentEarn.id);
+  assert(rtL.statValue("gold") === 8, "spent [once][earn] cannot be milked");
+  assert(rtL.getChoices().find((c) => c.text.includes("loop"))!.used !== true, "unpicked choices are not marked used");
+  rtL.choose(rtL.getChoices().find((c) => c.text.includes("loop"))!.id);
+  assert(rtL.getChoices().find((c) => c.text.includes("loop"))!.used === true, "picked plain choices are marked used (still clickable)");
 
   // pay+check: deducts on attempt, even when the roll fails (crit fail at rng 0).
   rtL.choose(rtL.getChoices().find((c) => c.cost && c.check)!.id);
@@ -434,6 +454,15 @@ console.log("\ntheme directives:");
   assert(badFont.errors.some((e) => e.message.includes("choose: mono, serif")), "unknown @font rejected");
   assert(parseGame(`== s\nhi\n* x -> END\n`).game!.theme.bg === undefined, "theme optional");
 
+  // @reveal line pacing
+  assert(parseGame(`== s\nhi\n* x -> END\n`).game!.reveal === "click", "reveal defaults to click");
+  assert(parseGame(`@reveal paced\n== s\nhi\n* x -> END\n`).game!.reveal === "paced", "@reveal paced parsed");
+  assert(parseGame(`@reveal off\n== s\nhi\n* x -> END\n`).game!.reveal === "off", "@reveal off parsed");
+  assert(
+    parseGame(`@reveal typewriter\n== s\nhi\n* x -> END\n`).errors.some((e) => e.message.includes("@reveal must be")),
+    "unknown @reveal rejected",
+  );
+
   // Declarations tolerate trailing " # comment" (passage text is untouched).
   const inline = parseGame(
     `@font serif      # mono (default), serif, book, sans, humanist\n` +
@@ -481,6 +510,16 @@ skill gold_sense "Gold Sense" = 2
 
   const noCur = parseGame(`== s\n~ pay 5\n* x -> END\n`);
   assert(noCur.errors.some((e) => e.message.includes("needs a currency")), "~ pay without currency rejected");
+
+  // ~ skill validation
+  assert(
+    parseGame(`skill a "A"\n== s\n~ skill b +1\n* x -> END\n`).errors.some((e) => e.message.includes('unknown skill "b"')),
+    "~ skill on undeclared skill rejected",
+  );
+  assert(
+    parseGame(`skill a "A"\n== s\n~ skill a +0\n* x -> END\n`).errors.some((e) => e.message.includes("non-zero")),
+    "~ skill +0 rejected",
+  );
 
   // [pay N] / [earn N] choice costs.
   const pc = parseGame(`

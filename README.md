@@ -12,9 +12,11 @@ share them with a public link.
   2d6 + skill + equipment vs the difficulty, with DE rules: double-6 always
   succeeds, double-1 always fails, red checks are once-ever; success odds are
   shown on the choice. A failed **white** check locks (greyed) until the skill
-  total improves past where it failed — via `~ points` or better equipment
+  itself is upgraded past where it failed — equipment affects rolls but
+  cannot reopen a failed check
 - **Skill points** — `~ points 1` grants points mid-game and re-opens the
-  +/− allocation screen (no per-skill cap on level-ups)
+  +/− allocation screen (no per-skill cap on level-ups); `~ skill name -1`
+  applies an author-directed change to one skill, shown to the player
 - **Checkpoints** — authors place `~ save` where progress should persist;
   players get CONTINUE / START OVER on return. No free saving, no savescumming.
   Saves are per-browser and invalidated when the game is republished
@@ -116,10 +118,14 @@ set `ADMIN_TOKEN=<secret>` and call
 
 ## Script cheatsheet
 
+The full reference, with descriptions and examples for everything, is at
+[andstar.org/docs](https://andstar.org/docs).
+
 ```text
 @title My Game
 @points 4 max 6                 # optional: pre-game skill point allocation
 @wardrobe open                  # optional: free equipping all game (default locked)
+@reveal paced                  # optional: click (default, tap per line), paced (timed), off
 @bg #101820                     # optional: background color (shades derived)
 @accent #e94560                 # optional: accent color
 @font serif                     # optional: book (default), mono, serif, sans, humanist
@@ -141,6 +147,7 @@ logic: Skills speak too.
 ~ set morale = morale - 1
 ~ pay 20                        # spend currency; ~ earn 5 to gain
 ~ points 1                      # grant skill points (player allocates immediately)
+~ skill sangfroid -1            # author-directed skill change, shown to the player
 ~ save                          # checkpoint; player resumes here on return
 * Plain choice -> other_passage
 * [morale >= 2] Conditional choice -> other_passage

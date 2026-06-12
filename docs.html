@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>docs · andstar</title>
+    <meta name="description" content="Reference for the andstar script language: declarations, passages, choices, checks, effects, and how play works." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body class="docs-page">
+    <main class="docs-main" id="top">
+      <header class="docs-header">
+        <a href="/" class="docs-brand" title="andstar home">
+          <svg class="docs-mark" viewBox="0 0 488.43 424.72" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-label="andstar">
+            <path d="M0,324.37c0-40.25,14.58-89.84,53.09-121.93,3.5-2.92,4.08-5.83,1.17-9.92-20.42-25.67-26.25-56.01-26.25-81.09C28,84.59,105.01,0,126.6,0c26.84,0,99.76,51.34,99.76,78.76,0,25.09-19.25,78.76-70.59,127.77-2.92,2.92-4.08,5.83-2.33,8.17,11.67,14.58,30.34,35,46.09,53.67,3.5,4.08,7,3.5,9.92-1.17,12.25-19.84,22.17-56.59,29.17-75.84,1.75-5.25,7-10.5,13.42-5.83,11.67,8.75,22.17,16.34,36.17,22.75,7.58,3.5,3.5,8.75,1.17,13.42-9.33,18.67-30.34,61.26-46.67,85.18-2.33,3.5-2.92,6.42,0,9.92,18.09,22.17,34.42,40.84,52.51,64.76,4.08,5.83,3.5,8.75-.58,12.25-13.42,10.5-28,19.25-42,29.17-4.08,2.92-9.92,0-12.83-3.5-11.08-13.42-19.25-25.09-30.92-39.09-2.33-3.5-5.83-4.08-9.33-1.17-33.25,23.34-73.51,45.51-86.34,45.51-34.42,0-113.18-62.42-113.18-100.35ZM170.35,343.04c1.17-6.42-3.5-12.83-5.25-15.17-22.75-26.84-47.26-60.09-72.93-89.84-3.5-4.08-7.58-4.08-9.92.58-9.33,19.25-11.08,42.01-11.08,61.26,0,30.34,39.09,66.51,70.59,66.51,8.75,0,25.67-11.67,28.59-23.34ZM162.77,109.1c0-22.17-41.42-49.01-59.51-49.01-4.67,0-9.92,4.08-9.92,10.5,0,41.42,14.58,72.93,28,99.18,3.5,6.42,7.58,5.25,11.08,2.33,26.25-21.59,30.34-49.01,30.34-63.01Z"/>
+            <path d="M311.94,172.1c-3.5-2.33-4.67-7.58-.58-9.92,18.09-10.5,36.17-27.42,46.67-43.76,2.92-4.67,2.33-7-3.5-8.75-19.84-5.83-43.17-5.83-63.01-8.75-4.08-.58-7-4.08-5.25-8.75l12.25-38.5c1.17-4.08,5.25-4.67,8.75-2.92,19.84,9.92,39.09,23.92,56.59,29.75,5.25,1.75,8.17.58,7.58-5.25-1.75-19.84-3.5-43.76-11.67-62.42-1.75-4.08,1.17-7,5.83-7h44.34c4.08,0,6.42,2.92,5.83,7-2.92,19.84-9.92,42.59-12.25,62.42-.58,5.25,2.33,7,7.58,5.25,18.67-6.42,39.67-15.75,56.01-29.75,3.5-2.92,7.58-.58,8.75,2.92l12.25,39.67c1.17,4.08-1.17,8.17-5.25,8.17-19.25,0-42.59,4.67-62.42,8.75-5.83,1.17-7,3.5-3.5,8.17,11.67,15.75,30.34,30.34,46.09,43.76,4.08,3.5,2.92,7-.58,9.33l-33.84,25.67c-3.5,2.33-8.17,2.92-9.92-1.75-7.58-19.84-15.75-43.76-26.84-58.34-3.5-4.67-5.83-5.25-9.33,0-11.08,16.34-16.92,42-27.42,58.34-2.92,4.67-6.42,4.08-9.92,1.75l-33.25-25.09Z"/>
+          </svg>
+        </a>
+        <h1 class="docs-h1">
+          <svg class="docs-wordmark" viewBox="0 0 836.22 177.43" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-label="andstar">
+            <path d="M86.81,67.25h38.16v106.6h-38.16v-11.69c-8.82,12.16-22.66,15.26-33.15,15.26-11.45,0-25.52-3.34-38.4-16.93C5.01,149.53,0,137.36,0,121.39c0-20.03,7.87-34.1,16.46-42.69,9.06-9.06,23.13-15.02,38.4-15.02,17.17,0,27.43,8.82,31.96,13.83v-10.25ZM46.74,103.02c-5.25,5.01-7.63,11.92-7.63,17.41,0,6.2,2.62,12.88,7.39,17.41,4.05,3.82,10.73,7.15,17.17,7.15s12.4-2.62,17.17-7.39c3.34-3.34,7.15-8.58,7.15-17.17,0-5.01-1.43-11.69-7.39-17.41-3.58-3.34-9.06-6.92-17.17-6.92-4.77,0-11.21,1.67-16.69,6.92Z"/>
+            <path d="M149.34,67.25h38.16v13.35c10.49-13.83,24.56-15.74,33.86-15.74,10.97,0,22.66,2.62,31.48,11.45,9.06,9.06,10.02,18.12,10.02,29.81v67.73h-38.16v-53.9c0-6.2.24-15.5-4.77-20.75-3.58-3.82-8.35-4.53-12.16-4.53-5.96,0-10.97,2.15-14.07,5.01-3.82,3.58-6.2,10.49-6.2,16.93v57.24h-38.16v-106.6Z"/>
+            <path d="M406.37,173.85h-38.16v-11.69c-10.73,13.83-24.8,15.26-32.19,15.26-15.26,0-27.43-5.01-37.44-14.79-10.73-10.49-17.17-25.52-17.17-42.45,0-18.12,7.63-32.91,17.41-42.21,10.49-10.02,24.56-14.31,37.68-14.31,14.55,0,24.8,6.44,31.72,13.83V0h38.16v173.85ZM361.3,138.56c5.01-4.53,8.11-11.69,8.11-18.12,0-5.96-3.34-13.12-7.15-17.17-4.29-4.53-10.25-7.15-17.41-7.15-8.11,0-13.59,3.58-16.93,6.92-4.29,4.29-7.39,10.97-7.39,18.12,0,5.49,2.38,11.69,7.39,16.69,5.25,5.25,11.45,7.15,16.93,7.15,6.2,0,12.4-2.86,16.46-6.44Z"/>
+            <path d="M436.09,138.56c4.53,3.34,10.02,6.2,15.26,7.87,4.77,1.67,10.73,2.62,14.79,2.62,2.86,0,7.39-.72,9.78-2.86,1.67-1.67,1.91-3.1,1.91-5.01,0-1.67-.24-3.34-1.91-4.77-2.38-2.15-6.2-2.86-10.02-3.82l-10.02-2.38c-5.25-1.19-12.88-3.1-18.6-9.3-4.05-4.29-6.92-10.25-6.92-18.36,0-10.25,4.05-19.79,10.02-25.99,8.11-8.35,22.42-12.88,38.16-12.88s27.9,4.29,34.1,6.92l-12.88,24.33c-5.25-2.39-13.12-5.25-20.03-5.25-3.82,0-6.44.72-8.82,2.15-2.15,1.19-3.34,2.86-3.34,5.25,0,3.34,2.15,5.01,4.53,5.96,3.58,1.43,6.68,1.43,12.64,3.1l6.92,1.91c5.01,1.43,12.64,5.25,15.74,8.35,5.25,5.01,8.11,13.35,8.11,21.22,0,12.88-5.49,21.46-10.73,26.47-12.4,12.4-30.53,13.35-39.35,13.35-9.54,0-24.56-1.19-42.93-12.4l13.59-26.47Z"/>
+            <path d="M575.87,98.49v75.36h-38.16v-75.36h-12.16v-31.24h12.16v-35.06h38.16v35.06h21.7v31.24h-21.7Z"/>
+            <path d="M693.08,67.25h38.16v106.6h-38.16v-11.69c-8.82,12.16-22.66,15.26-33.15,15.26-11.45,0-25.52-3.34-38.39-16.93-10.25-10.97-15.26-23.13-15.26-39.11,0-20.03,7.87-34.1,16.46-42.69,9.06-9.06,23.13-15.02,38.39-15.02,17.17,0,27.43,8.82,31.96,13.83v-10.25ZM653.01,103.02c-5.25,5.01-7.63,11.92-7.63,17.41,0,6.2,2.62,12.88,7.39,17.41,4.05,3.82,10.73,7.15,17.17,7.15s12.4-2.62,17.17-7.39c3.34-3.34,7.15-8.58,7.15-17.17,0-5.01-1.43-11.69-7.39-17.41-3.58-3.34-9.06-6.92-17.17-6.92-4.77,0-11.21,1.67-16.69,6.92Z"/>
+            <path d="M755.61,67.25h38.16v17.41c3.82-7.15,9.3-11.92,15.02-14.79,5.72-3.1,12.64-4.29,19.79-4.29.95,0,2.62.24,7.63.48v36.01c-1.91-.95-7.15-3.82-16.46-3.82-5.01,0-11.92.72-17.41,5.72-8.11,7.39-8.58,18.6-8.58,24.33v45.55h-38.16v-106.6Z"/>
+          </svg>
+          <span>docs</span>
+        </h1>
+        <p class="docs-sub">the complete reference for the script language. for a guided start, open
+        <a href="/create">the editor</a>: it loads a sample game that uses everything on this page.</p>
+      </header>
+
+      <nav class="docs-toc">
+        <a href="#shape">the shape of a script</a>
+        <a href="#declarations">declarations</a>
+        <a href="#passages">inside a passage</a>
+        <a href="#choices">choices</a>
+        <a href="#effects">effects</a>
+        <a href="#expressions">expressions</a>
+        <a href="#play">how play works</a>
+        <a href="#publishing">publishing and exporting</a>
+      </nav>
+
+      <section id="shape">
+        <h2>the shape of a script</h2>
+        <p>A game is one plain-text file with two regions: declarations at the top
+        (what exists), then passages (what happens). The first passage is where the
+        game begins. Lines starting with <code>#</code> are comments.</p>
+<pre>@title My Game
+@author Me
+
+skill nerve "Nerve" #8fb3a8 = 2
+char jekyll "Dr. Jekyll" #f0c987
+
+== start
+jekyll: "Ready?"
+* "Ready." -> begin
+
+== begin
+-> END</pre>
+      </section>
+
+      <section id="declarations">
+        <h2>declarations</h2>
+        <p>These only work above the first passage. Declaration lines may carry a
+        trailing <code># comment</code>.</p>
+
+        <div class="doc-entry">
+          <h3><code>@title</code> / <code>@author</code></h3>
+          <p>Shown on the play page header and used for the share link preview.</p>
+          <pre>@title Dead Reckoning
+@author Fable</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>@start</code></h3>
+          <p>Begin at a specific passage instead of the first one defined.</p>
+          <pre>@start cockpit</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>@points</code></h3>
+          <p>Shows a build screen before play: the player distributes this many extra
+          points on top of your declared skill values. <code>max</code> caps any one
+          skill at creation. Restarting returns to this screen. Without this line,
+          play begins immediately.</p>
+          <pre>@points 4 max 6</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>@wardrobe</code></h3>
+          <p>Whether players may freely equip and unequip items. The default is
+          <code>locked</code>: players can see their gear but only change it when your
+          script allows it (see the <code>~ wardrobe</code> effect). <code>open</code>
+          leaves it free for the whole game.</p>
+          <pre>@wardrobe open</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>@reveal</code></h3>
+          <p>Line pacing on the play page. <code>click</code> (the default) reveals one
+          line per tap, space, or enter. <code>paced</code> reveals lines on a timer,
+          and a tap skips ahead. <code>off</code> shows each new passage at once.
+          The editor preview is always instant.</p>
+          <pre>@reveal paced</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>@fail</code></h3>
+          <p>A fail rule: whenever an effect changes state and this condition is true,
+          the run fails. The player sees your message and returns to the last
+          checkpoint (see <code>~ save</code>), or restarts if there is none. You can
+          declare several rules. A choice can also fail directly with the
+          <code>FAIL</code> target.</p>
+          <pre>@fail resolve &lt;= 0 "The sand is soft as snow, and warm."</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>@bg</code> / <code>@accent</code> / <code>@font</code></h3>
+          <p>Restyle the player for your game. <code>@bg</code> takes a six-digit hex
+          color; panel, border, and dim-text shades are derived from it, and light
+          backgrounds get dark text automatically. <code>@accent</code> recolors the
+          highlights. <code>@font</code> is one of <code>book</code> (the default),
+          <code>mono</code>, <code>serif</code>, <code>sans</code>,
+          <code>humanist</code>.</p>
+          <pre>@bg #10141d
+@accent #c8a96a
+@font serif</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>skill</code></h3>
+          <p>A skill is three things at once: a number the player can grow, a voice
+          that can speak lines, and the thing dice checks roll against. The trailing
+          number is its starting value (2 if omitted); the color is used wherever the
+          skill appears.</p>
+          <pre>skill sangfroid "Sang-Froid" #8fb3a8 = 2</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>char</code></h3>
+          <p>A character who can speak. The first word is the short id you type in
+          dialogue lines; the quoted name is what readers see. Declaring a
+          <code>you</code> character is a common way to give the protagonist spoken
+          lines.</p>
+          <pre>char marchand "Marchand" #f0c987
+char jekyll "Dr. Jekyll" #b8c4cc
+char you "You" #e0d6c3</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>item</code></h3>
+          <p>Items with skill modifiers are equipment: players can equip them when the
+          wardrobe is open, and the modifiers apply to every roll and total while
+          equipped. Items without modifiers are plain possessions: no equip box, but
+          <code>has(item)</code> still works in conditions.</p>
+          <pre>item jacket "Flying Jacket" sangfroid+1 hands-1
+item chart "Soaked Chart"</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>currency</code></h3>
+          <p>One per game. Shows at the bottom of the player's status panel and powers
+          the <code>[pay]</code>/<code>[earn]</code> choice tags and
+          <code>~ pay</code>/<code>~ earn</code> effects. It behaves as a normal
+          variable in conditions. It does not have to be money.</p>
+          <pre>currency water "Water (cups)" = 0</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>var</code> / <code>stat</code></h3>
+          <p>Both declare a named value: a number, <code>true</code>/<code>false</code>,
+          or a <code>"string"</code>. A <code>stat</code> additionally appears in the
+          player's status panel; a <code>var</code> is hidden bookkeeping.</p>
+          <pre>stat resolve = 3
+var knows_drift = false</pre>
+        </div>
+      </section>
+
+      <section id="passages">
+        <h2>inside a passage</h2>
+
+        <div class="doc-entry">
+          <h3><code>== name</code></h3>
+          <p>Starts a passage. Names are single words (letters, digits, underscores).
+          <code>::</code> also works, for Twine muscle memory.</p>
+          <pre>== night_walk</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3>narration</h3>
+          <p>Any plain line is narration. If a narration line would be mistaken for
+          another kind of line (it starts with a bracket, or a word followed by a
+          colon), start it with <code>|</code> to force it.</p>
+          <pre>The desert at night is black sand under black sky.
+| Warning: the well is dry.</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3>dialogue</h3>
+          <p>A declared character or skill id, a colon, and the line. Skills speak in
+          their color with a bold name; using an undeclared name is a compile error
+          (it is usually a typo).</p>
+          <pre>marchand: "I'm not dead. That's the main thing."
+sangfroid: Say it plainly and do not say it again.</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>?</code> passive checks</h3>
+          <p>An interjection that appears only if the skill's current total (including
+          equipment) meets the number. No dice: passives are deterministic, and each
+          fires at most once per run.</p>
+          <pre>? senses 7: Petrol, but faint, and fading. She didn't burn.</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>-></code> jumps</h3>
+          <p>Go straight to another passage. <code>END</code> finishes the game;
+          <code>FAIL</code> triggers the fail state. With a line gate in front, a jump
+          becomes conditional, which is how one passage can quietly route to different
+          scenes.</p>
+          <pre>-> dawn
+[has(chart)] -> shortcut</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3>line gates: <code>[condition]</code> and <code>[once]</code></h3>
+          <p>Any non-choice line (narration, dialogue, effects, jumps) can carry gates
+          in front. A condition gate skips the line when false. <code>[once]</code>
+          runs the line at most once per game, however often the passage repeats. This
+          is how one passage varies with state instead of being cloned.</p>
+          <pre>[once] Silence, enormous and sudden.
+[knows_drift] reckoning: You are lower than the dial says.
+[resolve &lt; 2] ~ set shaky = true</pre>
+        </div>
+      </section>
+
+      <section id="choices">
+        <h2>choices</h2>
+
+        <div class="doc-entry">
+          <h3>basics</h3>
+          <p>Choices start with <code>*</code> and end with a target. All choices in a
+          passage are offered together after its lines. Choices the player has picked
+          before are shown in red; they stay selectable unless marked
+          <code>[once]</code>.</p>
+          <pre>* Wait for dawn -> dawn
+* Walk out now, into the dark -> night_walk</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3>bracket gates</h3>
+          <p>Brackets before the text modify the choice, and they combine freely:
+          any number of conditions (all must hold), plus at most one check and one
+          cost, plus <code>[once]</code>. A hidden condition hides the choice
+          entirely; a spent <code>[once]</code> stays visible but locked.</p>
+          <pre>* [has(chart)] Follow the chart's legible corner -> walk_end
+* [once] Go through the wreck, pocket by pocket -> salvage
+* [once] [mae_trusts] [pay 10] Buy her silence -> quiet</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3>skill checks: <code>[white]</code> and <code>[red]</code></h3>
+          <p>A check rolls dice when chosen and needs two targets: success, then
+          failure, separated by <code>|</code>. The tag on the choice shows the skill,
+          difficulty, and live success odds. <code>white</code> checks can be retried
+          after the skill itself improves; <code>red</code> checks get one attempt
+          ever, and the whole choice is outlined in red as a warning.</p>
+          <pre>* [white reckoning 10] Run the numbers again -> drift_yes | drift_no
+* [red hands 12] Fly her into the ground like a landing -> wreck | wreck_hurt</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3>costs: <code>[pay]</code> and <code>[earn]</code></h3>
+          <p>A pay choice shows its price, greys out when the player can't afford it,
+          and charges on selection. <code>[earn]</code> is the reverse. A cost and a
+          check can share a choice; the cost applies on the attempt, then the dice
+          decide.</p>
+          <pre>* [pay 1] Drink. One cup. -> drink
+* [pay 5] [white sense 9] Ante up and read the table -> win | lose</pre>
+        </div>
+      </section>
+
+      <section id="effects">
+        <h2>effects</h2>
+        <p>Effect lines start with <code>~</code> and change state as the passage
+        plays. All accept line gates.</p>
+
+        <div class="doc-entry">
+          <h3><code>~ set</code></h3>
+          <p>Assign any variable, stat, or skill from an expression. Silent: nothing
+          is shown to the player.</p>
+          <pre>~ set resolve = resolve - 1
+~ set knows_drift = true</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>~ give / take / equip / unequip</code></h3>
+          <p>Move items in and out of the player's possession. <code>give</code> and
+          <code>take</code> announce themselves; <code>equip</code> also gives the item
+          if needed and puts it on regardless of the wardrobe state.</p>
+          <pre>~ give torch
+~ equip jacket
+~ take orange</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>~ pay / earn</code></h3>
+          <p>Spend or gain currency, with a visible line. The amount can be an
+          expression. Requires a declared currency.</p>
+          <pre>~ earn 2
+~ pay toll</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>~ points</code></h3>
+          <p>Grant skill points. The player allocates them immediately on a +/−
+          screen, anywhere they like, before play continues.</p>
+          <pre>~ points 1</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>~ skill</code></h3>
+          <p>An author-directed change to one specific skill, up or down, announced to
+          the player. Raising a skill this way can reopen its failed white checks;
+          this and <code>~ points</code> are the two ways through that lock.</p>
+          <pre>~ skill sangfroid -1</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>~ save</code></h3>
+          <p>A checkpoint. Progress persists in the reader's browser; returning
+          visitors get CONTINUE or START OVER, and fail states return here. There is
+          no player-initiated saving: you decide where the mercy goes.</p>
+          <pre>~ save</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>~ wardrobe</code></h3>
+          <p>Open or close the player's ability to change equipment. Typical rhythm:
+          open during safe scenes, close before commitments.</p>
+          <pre>~ wardrobe open
+~ wardrobe close</pre>
+        </div>
+      </section>
+
+      <section id="expressions">
+        <h2>expressions</h2>
+        <p>Conditions, <code>~ set</code>, <code>~ pay</code>/<code>~ earn</code>
+        amounts, and curly interpolation all use the same small language:</p>
+        <ul>
+          <li>arithmetic <code>+ - * /</code>, comparison <code>== != &gt; &lt; &gt;= &lt;=</code>, logic <code>and or not</code> (or <code>&amp;&amp; || !</code>), parentheses</li>
+          <li>numbers, <code>true</code>/<code>false</code>, <code>"strings"</code></li>
+          <li>any declared var, stat, or currency by name</li>
+          <li>a skill name means its current total, including equipped items</li>
+          <li><code>has(item)</code> is true while the player holds the item</li>
+        </ul>
+        <p>Inside narration, dialogue, or choice text, <code>{expression}</code> is
+        replaced with its value. Braces that don't parse are left alone.</p>
+        <pre>* [water &gt;= 2 and not has(chart)] Ration carefully -> morning
+You fill your pockets: raisins, the thermos with its {water} cups.</pre>
+      </section>
+
+      <section id="play">
+        <h2>how play works</h2>
+
+        <div class="doc-entry">
+          <h3>dice</h3>
+          <p>A check rolls 2d6 and adds the skill's total (base plus equipment).
+          Meet or beat the difficulty to succeed. Double sixes always succeed;
+          double ones always fail. The roll is shown itemized, and choices display
+          their live odds.</p>
+          <p>Difficulty names, for flavor and calibration:</p>
+          <pre>6 Trivial   8 Easy   10 Medium   12 Challenging
+14 Formidable   16 Legendary   18 Heroic   20 Impossible</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3>white checks, red checks, and the lock</h3>
+          <p>A failed white check locks, marked <code>failed</code>, until that skill
+          itself is upgraded past the value it failed at (via <code>~ points</code> or
+          <code>~ skill</code>). Equipment improves rolls but cannot reopen a failed
+          check: the mind that failed has to grow. A passed check disappears. A red
+          check is once ever, whatever happens.</p>
+        </div>
+
+        <div class="doc-entry">
+          <h3>checkpoints and failure</h3>
+          <p>When a <code>@fail</code> rule triggers or a choice hits <code>FAIL</code>,
+          the run ends with your message and one button: return to the last
+          <code>~ save</code>, or start over if none was reached. Checkpoints live in
+          the reader's browser, per game; republishing a game invalidates old
+          checkpoints. Finishing a game clears its checkpoint.</p>
+        </div>
+
+        <div class="doc-entry">
+          <h3>reading flow</h3>
+          <p>By default each tap reveals one line, and everything above the newest
+          line dims so the reader's place is always the bright edge. Choices appear
+          when the passage has fully arrived. Already-picked choices show in red.</p>
+        </div>
+      </section>
+
+      <section id="publishing">
+        <h2>publishing and exporting</h2>
+        <p>PUBLISH puts your game at a bare link you can share; readers play in the
+        browser with no account, and you can republish updates to the same link or
+        unpublish it from the same browser you published from. EXPORT downloads a zip
+        holding a self-contained playable <code>index.html</code> (it runs offline,
+        forever, with no dependence on this site) plus your script as
+        <code>source.txt</code>. IMPORT reads that zip, or any plain
+        <code>.txt</code>, back into the editor. The zip is also exactly what
+        itch.io's "HTML project" upload wants, if you'd like to host or sell your
+        game there.</p>
+        <p>What you publish stays yours. Stories are never used for AI training, sold,
+        or mined for data.</p>
+      </section>
+
+      <footer class="docs-footer">
+        <a href="/">&amp;* home</a> · <a href="/create">open the editor</a> · <a href="/play/demo">play the demo</a> · <a href="#top">back to top</a>
+      </footer>
+    </main>
+  </body>
+</html>

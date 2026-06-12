@@ -56,11 +56,14 @@
         <details class="help">
           <summary>LANGUAGE REFERENCE</summary>
           <div class="help-body">
+            <p>This is the quick version. The full reference, with descriptions and
+            examples for everything, lives at <a href="/docs" target="_blank" rel="noopener">andstar.org/docs</a>.</p>
             <h4>Declarations (top of file)</h4>
             <pre>@title My Game
 @author Me
 @points 4 max 6                     # players distribute 4 points before play
 @wardrobe open                      # let players swap gear anytime (default: locked)
+@reveal paced                       # line pacing: click (default, tap per line), paced, off
 @fail morale &lt;= 0 "message"         # fail state — player returns to the last ~ save
 @bg #101820                         # background color (other shades are derived)
 @accent #e94560                     # accent color
@@ -83,6 +86,7 @@ logic: Skills can speak too — they render in italics, in their color.
 ~ pay 20                    # spend currency (~ earn 5 to gain); gate with [real >= 20]
 ~ wardrobe open             # allow equipping here (~ wardrobe close to lock)
 ~ points 1                  # grant skill points; the player allocates immediately
+~ skill sangfroid -1        # author-directed skill change, shown to the player
 ~ save                      # checkpoint — players resume here after closing the tab
 -> other_passage            # jump straight to another passage</pre>
             <h4>Choices &amp; checks</h4>
@@ -114,8 +118,9 @@ logic: Skills can speak too — they render in italics, in their color.
             <h4>Rolls</h4>
             <p>Checks roll 2d6 + skill + equipped item modifiers vs the difficulty.
             Double sixes always succeed, double ones always fail.
-            <b>White</b> checks lock on failure until the skill total improves past where
-            it failed (via <code>~ points</code> or better equipment); <b>red</b> checks are once-ever.
+            <b>White</b> checks lock on failure until the skill itself is upgraded past where
+            it failed (via <code>~ points</code> or <code>~ skill name +1</code> — equipment
+            affects rolls but won't reopen a failed check); <b>red</b> checks are once-ever.
             Text supports <code>{expr}</code> interpolation, e.g. <code>{morale}</code>.</p>
           </div>
         </details>

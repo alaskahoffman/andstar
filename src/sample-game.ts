@@ -22,6 +22,7 @@ export const SAMPLE_GAME = `# ==================================================
 # @bg #10141d
 # @accent #c8a96a
 # @font serif      # book (default), mono, serif, sans, humanist
+# @reveal paced   # line pacing: click (default), paced, off
 
 # --- skills: id "Name" #color = starting value -------------------
 # Skills can SPEAK in dialogue, gate passive interjections,
@@ -107,6 +108,7 @@ sangfroid: Hands at altitude one thousand. Whatever happens now, happens slowly 
 == wreck_hurt
 The world hits twice. The second time it takes something with it. When the noise stops you are tasting copper, and one rib moves in a way ribs should not.
 ~ set resolve = resolve - 1
+~ skill sangfroid -1
 -> wreck
 
 == wreck
@@ -147,6 +149,7 @@ The coffee is cold and tastes faintly of the thermos cork, and it is the finest 
 marchand: "I knew a man," Marchand says, to the engine, to the dark, "who walked out of the deep desert once. Eight days." A pause. "He was an idiot, that one. You're not."
 heart: He is building you a rope out of nothing, and handing you one end of it.
 ~ set resolve = resolve + 1
+~ points 1
 -> wreck
 
 == night_walk
