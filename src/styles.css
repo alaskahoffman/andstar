@@ -4,8 +4,8 @@
   --bg-panel: #161616;
   --bg-raised: #1d1d1d;
   --fg: #d8d8d8;
-  --fg-dim: #8e8e8e;
-  --fg-faint: #5d5d5d;
+  --fg-dim: #a2a2a2;
+  --fg-faint: #757575;
   --accent: #f2f2f2;
   --green: #8fba6a;
   --red: #c95f4e;
@@ -198,6 +198,124 @@ body.docs-page { overflow-y: auto; height: auto; }
 .docs-footer a { color: var(--fg-dim); text-decoration: none; }
 .docs-footer a:hover { color: var(--accent); }
 
+/* ---------- reader accessibility settings ---------- */
+/* These layer on top of author theme. They use !important custom properties so
+   they win over the inline vars applyTheme() sets on the same element. */
+
+/* text size — scales the reading surface, not the chrome. The --rscale var is
+   consumed in the .log and .choice rules further down. */
+.rsize-1 { --rscale: 1.15; }
+.rsize-2 { --rscale: 1.3; }
+.rsize-3 { --rscale: 1.5; }
+.log p { font-size: calc(15px * var(--rscale, 1) * var(--past-scale, 1)); }
+
+/* visible keyboard focus on the reading surface */
+.player button:focus-visible,
+.reader-menu button:focus-visible,
+.reader-gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* e-ink — a calm two-color view that overrides the author's colors entirely */
+.reink {
+  --bg: #f4f1e8 !important;
+  --bg-panel: #e9e4d6 !important;
+  --bg-raised: #ddd7c6 !important;
+  --fg: #1b1916 !important;
+  --fg-strong: #000000 !important;
+  --fg-dim: #4c473e !important;
+  --fg-faint: #6f6a5f !important;
+  --border: #b9b2a1 !important;
+  --accent: #1b1916 !important;
+  --green: #1b1916 !important;
+  --red: #1b1916 !important;
+}
+.reink .log p.past { opacity: 0.42; } /* clearer new-vs-read separation on light bg */
+/* neutralize the per-character / skill / check inline colors everywhere they
+   appear: dialogue, choice tags, the sidebar, and the build/level-up screens */
+.reink .log .speaker,
+.reink .choice .check-tag,
+.reink .choice .currency-tag,
+.reink .stat-name,
+.reink .build-name { color: var(--fg) !important; }
+/* red carries meaning the engine otherwise shows in color — restate it in text */
+.reink .choice.choice-red {
+  border-color: var(--fg) !important;
+  border-style: dashed;
+}
+.reink .choice.choice-red:hover,
+.reink .choice.choice-red:active { background: var(--bg-raised); }
+.reink .choice.choice-red .check-tag::after { content: " ⚠ one-shot"; }
+.reink .choice.choice-used { color: var(--fg) !important; }
+.reink .choice.choice-used .choice-num { color: var(--fg) !important; }
+.reink .choice.choice-used:not(.choice-spent)::after { content: "  · seen"; color: var(--fg-faint); }
+.reink .choice.choice-spent::after { content: "  · done"; color: var(--fg-faint); }
+
+/* settings button + panel. The button borrows the look of its neighbors:
+   a byline link on the play header, a .btn in the editor's preview head. */
+.reader-wrap { display: inline; }
+.reader-gear:not(.btn) {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.reader-gear:not(.btn):hover { color: var(--accent); }
+.reader-menu {
+  position: fixed;
+  z-index: 60;
+  width: 232px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--fg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.reader-menu[hidden] { display: none; }
+.reader-menu h4 {
+  margin: 0 0 12px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--fg-faint);
+}
+.rm-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.rm-stepper { display: inline-flex; align-items: center; gap: 8px; }
+.rm-stepper button {
+  width: 28px;
+  height: 26px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  cursor: pointer;
+  line-height: 1;
+}
+.rm-stepper button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.rm-stepper button:disabled { opacity: 0.35; cursor: default; }
+.rm-val { width: 4ch; text-align: center; color: var(--fg-dim); font-family: var(--mono); font-size: 12px; }
+.rm-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--fg);
+  cursor: pointer;
+  padding: 7px 0;
+  font-size: 13px;
+}
+.rm-box {
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--border);
+  flex: none;
+}
+.rm-toggle[aria-pressed="true"] .rm-box { background: var(--accent); border-color: var(--accent); }
+.rm-toggle:hover { color: var(--accent); }
+.rm-note { margin: 10px 0 0; color: var(--fg-faint); font-size: 11px; line-height: 1.5; }
+
 /* ---------- top bar ---------- */
 
 .topbar {
@@ -370,10 +488,10 @@ body.docs-page { overflow-y: auto; height: auto; }
   background: var(--bg-panel);
   border-left: 1px solid var(--border);
   padding: 12px 14px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--rscale, 1)); /* scales with reader text size */
 }
 .sheet h3 {
-  font-size: 11px;
+  font-size: 0.88em;
   color: var(--fg-faint);
   margin: 14px 0 6px;
   border-bottom: 1px solid var(--border);
@@ -398,15 +516,18 @@ button.item-row {
   text-align: left;
 }
 button.item-row:hover .stat-name { color: var(--accent); }
-.item-mods { font-size: 11px; }
+.item-mods { font-size: 0.88em; }
 .currency-name { color: var(--accent); }
 .plain-item .stat-name { color: var(--fg-dim); }
-.hint { color: var(--fg-faint); font-size: 11px; margin-top: 10px; }
+.hint { color: var(--fg-faint); font-size: 0.88em; margin-top: 10px; }
 
 /* ---------- log ---------- */
 
-.log p { margin: 0 0 14px; max-width: 72ch; transition: opacity 0.4s ease; }
-.log p.past { opacity: 0.45; } /* read text recedes; the bright edge is your place */
+.log p { margin: 0 0 14px; max-width: 72ch; transition: opacity 0.4s ease, font-size 0.3s ease; }
+/* read text recedes — smaller AND a touch dimmer — so the bright, full-size
+   newest line is unmistakably your place. The shrink does most of the work,
+   which keeps already-read text legible if you glance back. */
+.log p.past { opacity: 0.66; --past-scale: 0.84; }
 .log p.reveal { animation: fadeline 0.5s ease-out; }
 .continue-hint {
   color: var(--fg-faint);
@@ -429,12 +550,12 @@ button.item-row:hover .stat-name { color: var(--accent); }
 .log .passive { opacity: 0.95; }
 .log .check-tag { color: var(--fg-faint); font-style: normal; font-size: 12px; }
 .log .sep { color: var(--fg-faint); }
-.log .system { color: var(--fg-faint); font-size: 12.5px; }
+.log .system { color: var(--fg-faint); font-size: calc(12.5px * var(--rscale, 1) * var(--past-scale, 1)); }
 .log .roll {
   border: 1px solid var(--border);
   background: var(--bg-panel);
   padding: 8px 12px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--rscale, 1) * var(--past-scale, 1));
 }
 .log .roll .verdict { font-weight: 700; }
 .log .roll-success .verdict { color: var(--green); }
@@ -506,7 +627,7 @@ button.item-row:disabled:hover .stat-name { color: var(--fg); }
   background: none;
   border: 1px solid transparent;
   color: var(--fg);
-  font-size: 14px;
+  font-size: calc(14px * var(--rscale, 1));
   line-height: 1.5;
   padding: 6px 10px;
   cursor: pointer;
@@ -519,9 +640,10 @@ button.item-row:disabled:hover .stat-name { color: var(--fg); }
 .choice-num { color: var(--accent); margin-right: 6px; }
 /* check/cost tags read as chips so the stakes are visible before any hover */
 .choice .check-tag {
-  font-size: 12px;
+  font-size: calc(12px * var(--rscale, 1));
   display: inline-block;
   padding: 0 7px;
+  margin-right: 7px; /* breathing room before the choice text */
   border: 1px solid var(--border);
   background: var(--bg-raised);
   line-height: 1.7;
@@ -628,7 +750,7 @@ button.item-row:disabled:hover .stat-name { color: var(--fg); }
     transform: translateX(100%);
     transition: transform 0.15s ease-out;
     box-shadow: -12px 0 30px rgba(0, 0, 0, 0.45);
-    font-size: 14px;
+    font-size: calc(14px * var(--rscale, 1)); /* scales with reader text size */
     padding: 16px 18px;
   }
   .player.sheet-open .sheet { transform: none; }
@@ -688,4 +810,15 @@ button.item-row:disabled:hover .stat-name { color: var(--fg); }
   }
   body.editor-page { display: flex; flex-direction: column; min-height: 100dvh; }
   .mobile-gate .btn { text-decoration: none; padding: 12px 22px; }
+}
+
+/* ---------- reduced motion ---------- */
+/* Respect the OS "reduce motion" setting: keep the staggered pacing (it's
+   reading rhythm, not decoration) but drop the slides, fades, and pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .log p { transition: none; }
+  .log p.reveal { animation: none; }
+  .continue-hint { animation: none; opacity: 0.7; }
+  .sheet { transition: none; }
+  .home-privacy.show { animation: none; }
 }

@@ -5,6 +5,7 @@
 import type { GameDef } from "../dsl/types";
 import { Runtime, type LogEntry, type VisibleChoice, type SaveData } from "../engine/runtime";
 import { applyTheme } from "./theme";
+import { applyReader, loadReader } from "./reader-settings";
 
 export interface SaveStore {
   load(): SaveData | null;
@@ -23,6 +24,12 @@ let lastBuild: { sig: string; alloc: Record<string, number> } | null = null;
 
 function buildSig(game: GameDef): string {
   return Object.keys(game.skills).sort().join(",");
+}
+
+// Apply an author-chosen color (skill/character name, check tag). E-ink mode
+// overrides these to its two tones via !important CSS.
+function setInk(elm: HTMLElement, color: string): void {
+  elm.style.color = color;
 }
 
 function el(tag: string, cls?: string, text?: string): HTMLElement {
@@ -48,9 +55,11 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
   container.classList.add("player");
   container.removeAttribute("style");
   applyTheme(container, game.theme);
+  applyReader(container, loadReader()); // reader prefs sit on top of author theme
 
   const main = el("div", "player-main");
   const logEl = el("div", "log");
+  logEl.setAttribute("aria-live", "polite"); // announce new lines to screen readers
   const choicesEl = el("div", "choices");
   main.append(logEl, choicesEl);
 
@@ -135,7 +144,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       for (const s of skills) {
         const row = el("div", "build-row");
         const name = el("span", "build-name", s.name.toUpperCase());
-        name.style.color = s.color;
+        setInk(name, s.color);
         const minus = el("button", "build-btn", "−") as HTMLButtonElement;
         const value = el("span", "build-value", String(s.base + alloc[s.id]));
         const plus = el("button", "build-btn", "+") as HTMLButtonElement;
@@ -234,14 +243,14 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       case "dialogue": {
         const p = el("p", entry.isSkill ? "dialogue skill-voice" : "dialogue");
         const name = el("span", "speaker", entry.name.toUpperCase());
-        name.style.color = entry.color;
+        setInk(name, entry.color);
         p.append(name, el("span", "sep", " — "), el("span", "", entry.text));
         return p;
       }
       case "passive": {
         const p = el("p", "dialogue skill-voice passive");
         const name = el("span", "speaker", entry.name.toUpperCase());
-        name.style.color = entry.color;
+        setInk(name, entry.color);
         p.append(
           name,
           el("span", "check-tag", ` [Passive] `),
@@ -254,7 +263,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
         const r = entry.roll;
         const p = el("p", `roll ${r.success ? "roll-success" : "roll-fail"}`);
         const name = el("span", "speaker", r.skillName.toUpperCase());
-        name.style.color = r.color;
+        setInk(name, r.color);
         const parts: string[] = [` [${r.type === "red" ? "Red" : "White"}: ${r.difficultyLabel} ${r.difficulty}]  `];
         parts.push(`2d6 → ${r.d1}+${r.d2}`);
         parts.push(` +${r.skillValue} ${r.skillName}`);
@@ -304,7 +313,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       for (const s of skills) {
         const row = el("div", "build-row");
         const name = el("span", "build-name", s.name.toUpperCase());
-        name.style.color = s.color;
+        setInk(name, s.color);
         const minus = el("button", "build-btn", "−") as HTMLButtonElement;
         const value = el("span", "build-value", String(rt!.skillBase(s.id) + alloc[s.id]));
         const plus = el("button", "build-btn", "+") as HTMLButtonElement;
@@ -357,7 +366,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       let locked = false;
       if (c.cost) {
         const sign = c.cost.kind === "pay" ? "−" : "+";
-        btn.append(el("span", "check-tag currency-tag", `[${sign}${c.cost.amount} ${c.cost.name.toUpperCase()}] `));
+        btn.append(el("span", "check-tag currency-tag", `[${sign}${c.cost.amount} ${c.cost.name.toUpperCase()}]`));
         locked = locked || c.cost.locked;
       }
       if (c.check) {
@@ -365,14 +374,14 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
         const tag = el(
           "span",
           `check-tag ${c.check.type === "red" ? "check-red" : "check-white"}`,
-          `[${c.check.skillName.toUpperCase()} — ${c.check.difficultyLabel} ${c.check.difficulty} ${suffix}] `,
+          `[${c.check.skillName.toUpperCase()} — ${c.check.difficultyLabel} ${c.check.difficulty} ${suffix}]`,
         );
-        tag.style.color = c.check.color;
+        setInk(tag, c.check.color);
         btn.append(tag);
         if (c.check.type === "red") btn.classList.add("choice-red");
         locked = locked || c.check.locked;
       }
-      btn.append(el("span", "", `${c.cost || c.check ? "" : " "}${c.text}`));
+      btn.append(el("span", "choice-text", c.text));
       if (c.used) btn.classList.add("choice-used"); // been here before — runs red
       if (c.locked) {
         // a spent [once]: visible, red, dead
@@ -419,7 +428,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       for (const s of skills) {
         const row = el("div", "stat-row");
         const name = el("span", "stat-name", s.name.toUpperCase());
-        name.style.color = s.color;
+        setInk(name, s.color);
         const eff = rt.effectiveSkill(s.id);
         const base = rt.skillBase(s.id);
         const val = el("span", "stat-val", eff !== base ? `${base}${eff > base ? "+" : ""}${eff - base} = ${eff}` : String(eff));
@@ -495,35 +504,69 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     for (let i = 0; i < kids.length - 1; i++) kids[i].classList.add("past");
   }
 
-  // Append one queued entry; finish the render when the queue empties.
-  function revealOne(): void {
-    const entry = revealQueue.shift();
-    if (entry) {
-      logEl.lastElementChild?.classList.add("past");
-      const p = renderLogEntry(entry);
-      p.classList.add("reveal");
-      logEl.append(p);
-      main.scrollTop = main.scrollHeight;
-    }
-    if (!revealQueue.length) {
-      revealing = false;
-      finishRender();
-    }
+  // Lines that don't need a deliberate tap to advance past: the echo of the
+  // choice the reader just made, and bookkeeping notices (item acquired,
+  // progress saved). These reveal themselves so only real prose waits.
+  function isAuto(e: LogEntry): boolean {
+    return e.kind === "system" || (e.kind === "narration" && e.text.startsWith("» "));
   }
 
-  function revealStep(): void {
-    revealOne();
-    if (revealQueue.length) {
-      // chrome lines (item pickups etc.) tick by faster than prose
-      const delay = revealQueue[0].kind === "system" ? 450 : 1000;
-      revealTimer = window.setTimeout(revealStep, delay);
-    } else {
+  function revealNode(entry: LogEntry): void {
+    logEl.lastElementChild?.classList.add("past");
+    const p = renderLogEntry(entry);
+    p.classList.add("reveal");
+    logEl.append(p);
+    main.scrollTop = main.scrollHeight;
+  }
+
+  function showContinueHint(): void {
+    choicesEl.innerHTML = "";
+    choicesEl.append(el("p", "continue-hint", "▼"));
+  }
+
+  function clearRevealTimer(): void {
+    if (revealTimer !== null) {
+      clearTimeout(revealTimer);
       revealTimer = null;
     }
   }
 
-  function showContinueHint(): void {
-    choicesEl.append(el("p", "continue-hint", "▼"));
+  // Reveal the next queued line, then decide what happens after it.
+  function stepNext(): void {
+    const e = revealQueue.shift();
+    if (!e) {
+      revealing = false;
+      finishRender();
+      return;
+    }
+    revealNode(e);
+    afterReveal(isAuto(e));
+  }
+
+  // Auto lines (the choice echo, item/save notices) appear normally and then
+  // advance on their own about a second later — no jarring instant flash, no
+  // wasted tap. Real prose waits for a tap (in paced mode it too is timed).
+  function afterReveal(wasAuto: boolean): void {
+    if (!revealQueue.length) {
+      revealing = false;
+      clearRevealTimer();
+      finishRender();
+      return;
+    }
+    revealing = true;
+    if (revealMode === "paced") {
+      revealTimer = window.setTimeout(stepNext, wasAuto ? 650 : 1500);
+    } else if (wasAuto) {
+      revealTimer = window.setTimeout(stepNext, 950);
+    } else {
+      showContinueHint();
+    }
+  }
+
+  // A tap reveals the next line immediately, then resumes the cascade.
+  function clickAdvance(): void {
+    clearRevealTimer();
+    stepNext();
   }
 
   function render(): void {
@@ -534,7 +577,14 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     }
     const fresh = rt.log.slice(rendered);
     rendered = rt.log.length;
-    if (revealMode === "off" || instantNext || (fresh.length <= 1 && !revealing)) {
+    if (fresh.length === 0) {
+      // a re-render with no new log (e.g. equipping mid-scene): refresh the
+      // panels without disturbing an in-progress reveal
+      renderSheet();
+      if (!revealing) renderChoices();
+      return;
+    }
+    if (revealMode === "off" || instantNext) {
       instantNext = false;
       for (const e of fresh) logEl.append(renderLogEntry(e));
       dimPast();
@@ -543,16 +593,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     }
     revealQueue.push(...fresh);
     choicesEl.innerHTML = ""; // choices appear once the prose has arrived
-    if (revealMode === "click") {
-      if (!revealing) {
-        revealing = true;
-        revealOne(); // first line lands immediately; the rest wait for taps
-      }
-      if (revealing) showContinueHint();
-    } else if (!revealing) {
-      revealing = true;
-      revealStep();
-    }
+    if (!revealing) stepNext();
   }
 
   function restart(): void {
@@ -563,7 +604,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     if (ev.target instanceof HTMLTextAreaElement || ev.target instanceof HTMLInputElement) return;
     if (revealing && (ev.key === " " || ev.key === "Enter")) {
       ev.preventDefault();
-      if (revealMode === "click") revealOne();
+      if (revealMode === "click") clickAdvance();
       else flushReveal();
       return;
     }
@@ -580,7 +621,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
   main.addEventListener("click", (ev) => {
     if (!revealing) return;
     if ((ev.target as HTMLElement).closest("button, a")) return;
-    if (revealMode === "click") revealOne();
+    if (revealMode === "click") clickAdvance();
     else flushReveal();
   });
 

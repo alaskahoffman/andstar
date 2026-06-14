@@ -1,5 +1,33 @@
 # changelog
 
+## 0.3.0
+
+Reading settings. A settings button in the header (play pages and the editor
+preview) opens reader-side options, saved per device for every game:
+
+- **Text size**: scales the reading surface (and sidebar) in steps.
+- **E-ink mode**: a calm two-color view (light background, dark text) that
+  overrides the author's colors. Where meaning was carried by color, it's
+  restated in text: red checks become a dashed "⚠ one-shot", already-picked
+  choices read "· seen" / "· done".
+
+These layer on top of author theming and never change the author's file.
+
+More accessibility, beyond those toggles:
+
+- New lines are announced to screen readers as they appear.
+- Keyboard focus is clearly outlined, and choices advance with space or enter.
+- The player honors the system "reduce motion" setting, dropping the fades
+  and slides while keeping the reading pace.
+- Secondary (dimmed) text is a little brighter across the board.
+
+Also: in click-to-continue, the echo of the choice you just made and
+bookkeeping notices (item acquired, progress saved) appear and then advance on
+their own, so a tap is only ever spent on new prose. Already-read lines recede
+by shrinking, not only dimming, so your place is always the largest line. Text
+size scales the sidebar and system notices too, and check chips have room to
+breathe before the choice text.
+
 ## 0.2.0
 
 The reading update, from the first 48 hours of playtester feedback.

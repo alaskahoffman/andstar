@@ -2,6 +2,7 @@ import "../styles.css";
 import { buildItchZip, readZipEntry } from "./itch-export";
 import { parseGame } from "../dsl/parser";
 import { mountPlayer, type PlayerHandle } from "../ui/player-view";
+import { mountReaderMenu } from "../ui/reader-settings";
 import { SAMPLE_GAME } from "../sample-game";
 import type { GameDef } from "../dsl/types";
 
@@ -286,6 +287,10 @@ publishBtn.onclick = async () => {
     publishBtn.disabled = false;
   }
 };
+
+// Reading settings affect the preview surface, so the gear lives in its head
+// (the .pane-head just above the errors strip and the preview).
+mountReaderMenu(errorsEl.previousElementSibling as HTMLElement, () => [previewEl as HTMLElement], "btn");
 
 // ---- boot ----
 sourceEl.value = localStorage.getItem(SOURCE_KEY) ?? SAMPLE_GAME;

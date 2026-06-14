@@ -6,6 +6,7 @@ import css from "../styles.css?inline";
 import { parseGame } from "../dsl/parser";
 import { mountPlayer, type SaveStore } from "../ui/player-view";
 import { applyTheme } from "../ui/theme";
+import { mountReaderMenu } from "../ui/reader-settings";
 import type { SaveData } from "../engine/runtime";
 
 declare global {
@@ -87,6 +88,7 @@ function boot(): void {
   };
 
   const handle = mountPlayer(playerEl, game, { save, reveal: true });
+  mountReaderMenu(header, () => [document.documentElement, playerEl]);
   restartLink.onclick = (ev) => {
     ev.preventDefault();
     if (confirm("Restart from the beginning? Your checkpoint will be erased.")) {

@@ -47,8 +47,8 @@ export function applyTheme(el: HTMLElement, theme: Theme): void {
     el.style.setProperty("--bg-panel", rgbToHex(mix(bg, fg, 0.05)));
     el.style.setProperty("--bg-raised", rgbToHex(mix(bg, fg, 0.1)));
     el.style.setProperty("--border", rgbToHex(mix(bg, fg, 0.18)));
-    el.style.setProperty("--fg-dim", rgbToHex(mix(fg, bg, 0.35)));
-    el.style.setProperty("--fg-faint", rgbToHex(mix(fg, bg, 0.55)));
+    el.style.setProperty("--fg-dim", rgbToHex(mix(fg, bg, 0.28)));
+    el.style.setProperty("--fg-faint", rgbToHex(mix(fg, bg, 0.48)));
   }
   if (theme.accent) el.style.setProperty("--accent", theme.accent);
   if (theme.font) el.style.setProperty("--font", FONTS[theme.font]);

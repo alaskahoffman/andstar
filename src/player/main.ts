@@ -2,6 +2,7 @@ import "../styles.css";
 import { parseGame } from "../dsl/parser";
 import { mountPlayer, type SaveStore } from "../ui/player-view";
 import { applyTheme } from "../ui/theme";
+import { mountReaderMenu } from "../ui/reader-settings";
 import type { SaveData } from "../engine/runtime";
 
 const playerEl = document.getElementById("player")!;
@@ -74,6 +75,9 @@ async function boot(): Promise<void> {
   };
 
   const handle = mountPlayer(playerEl as HTMLElement, game, { save, reveal: true });
+
+  const header = document.querySelector(".play-header") as HTMLElement;
+  mountReaderMenu(header, () => [document.documentElement, playerEl as HTMLElement]);
 
   const restartWrap = document.getElementById("restart-wrap")!;
   restartWrap.hidden = false;
