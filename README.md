@@ -29,16 +29,25 @@ share them with a public link.
 - **Character build** — `@points 4 max 6` shows a point-allocation screen
   before play; players distribute extra skill points on top of the authored
   bases (restart returns there to re-spec)
-- **Equipment** — items with skill buffs/debuffs (`item flask "Hip Flask"
-  gut+2 logic-1`); equipping is **locked by default** so players can't gear-swap
-  at a skill check — authors open it with `~ wardrobe open` / close it with
-  `~ wardrobe close` (or `@wardrobe open` to keep it free all game). Items
-  declared without modifiers are plain possessions (no equip box; `has(item)`
-  still works)
-- **Currency** — `currency real "Réal" = 20` puts money in the HUD; spend and
-  gain with `~ pay 20` / `~ earn 5`. `* [pay 20] Bribe him -> target` shows a
-  `[−20 RÉAL]` tag on the choice and greys it out when unaffordable
-  (`[earn 5]` for the reverse)
+- **Items, three kinds** — what an item modifies is what it is: a **skill** modifier
+  (`item flask "Hip Flask" gut+2 logic-1`) is **equipment** you wear; a **stat**
+  modifier (`item cup "Cup of Water" water+1`) is a **consumable** the reader clicks to
+  use any time, spending one; no modifier is a **key item** you just carry (`has(item)`
+  still gates on it). All three **stack** — `~ give water 3` / `~ take water`, shown as
+  `×N`, and `has(item)` reads as the count (`[has(cup) > 1]`, `{has(cup)}`)
+- **Equipment slots** — declare a slot to cap how many of a kind can be worn at once
+  (`slot hat "Headwear"`, limit 1 by default or `= N` for a budget) and put items in it
+  by using the slot's name as the keyword (`hat fedora "Fedora" logic+1`); filling a
+  slot swaps out the longest-worn piece, while slotless equipment has no limit.
+  Equipping is **locked by default** so players can't gear-swap at a skill check —
+  open with `~ wardrobe open` / close with `~ wardrobe close` (or `@wardrobe open` to
+  keep it free all game)
+- **Stats & currency** — a `stat morale = 2` shows in the STATUS panel; add
+  `max N` (`stat resolve = 3 max 5`) to draw it as a row of filled/empty pips that
+  clamps at the cap, a gauge the player sweats toward zero. A `currency real "Réal"
+  = 20` is money: shown as a float (`20.00`) at the foot of the sidebar, spent and
+  gained with `~ pay 20` / `~ earn 5`. `* [pay 20] Bribe him -> target` shows a
+  `[−20.00 RÉAL]` tag and greys out when unaffordable (`[earn 5]` for the reverse)
 - **Variables, stats, conditions** — `~ set morale = morale - 1`,
   `[morale >= 2]` gated choices, `{morale}` text interpolation
 - **Line gates** — any line (narration, dialogue, effects, `->` jumps) can be
@@ -133,8 +142,10 @@ skill logic "Logic" #6cb9ff = 3
 char kim "Kim" #f0c987
 item flask "Hip Flask" gut+2 logic-1
 item page "Torn Page"           # no modifiers = plain possession
-currency real "Réal" = 20
-stat morale = 2
+slot hat "Headwear"             # equipment slot; cap defaults to 1, "= N" for a budget
+hat fedora "Fedora" logic+1     # an item in the hat slot (slot name is the keyword)
+currency real "Réal" = 20       # money, shown as a float at the foot of the sidebar
+stat morale = 2 max 5           # "max N" draws a capped pip gauge; omit it for a plain number
 var seen_body = false
 
 == start

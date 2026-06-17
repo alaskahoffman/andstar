@@ -1,6 +1,4 @@
-// Default editor content: a short scene that demonstrates every DSL feature.
-
-export const SAMPLE_GAME = `# ============================================================
+const e=`# ============================================================
 #  TWO WINGS GOOD, a sample game
 #  The night mail goes down in the desert, 1935.
 #  Lines starting with # are comments.
@@ -253,4 +251,4 @@ THE LOGBOOK SAYS: NOT HOPE, EXACTLY. But it walked like hope, and you walked beh
 All day you build the pyre on the wing and do not light it. At dusk you light it. The fabric goes up with a sound like an enormous page turning, and the smoke stands straight up in the dead evening air, a black line a hundred meters tall. It is the largest thing you have ever written.
 THE LOGBOOK SAYS: THE FIRE. If anyone is looking, they will see it. You sit with Marchand in the firelight and are, for one hour, the only lamp in a thousand square kilometers.
 -> END
-`;
+`;export{e as SAMPLE_GAME};

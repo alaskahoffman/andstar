@@ -1,5 +1,69 @@
 # changelog
 
+## 0.4.0
+
+The systems update. Skills, equipment, items, and stats each got room to do
+more, and the sidebar reorganized to match.
+
+**Skills**
+
+- A skill can carry a description: `skill hands "The Hands" #d98b6a = 3 "what
+  it is"`. It shows on the character screen and as a sidebar tooltip, so a
+  player knows what they're choosing.
+- The build screen now lets you pull a skill down to 1 as well as up to 9 (or
+  the author's max), so you can min-max by trading points from one skill to
+  another. Mid-game level-ups honor the same ceiling.
+
+**Items, three kinds**
+
+What an item modifies is what it is:
+
+- A **skill** modifier (`item flask "Hip Flask" gut+2 logic-1`) is
+  **equipment**, worn from the wardrobe.
+- A **stat** modifier (`item cup "Cup of Water" water+1`) is a **consumable**:
+  it sits under ITEMS with its effect shown, and the reader clicks it any time
+  to apply the change and spend one. Their economy to manage, not only the
+  author's gates.
+- No modifier is a **key item**, just carried.
+
+Items also stack: `~ give water 3`, `~ take water`, shown as `×N`. And
+`has(item)` now reads as the count, so `[has(cup) > 1]` and `{has(cup)}` work,
+while a bare `[has(cup)]` still means "any."
+
+**Equipment slots**
+
+- A slot caps how many of a kind you can wear at once. Declare one with `slot
+  hat "Headwear"` (limit 1 by default, or `= N` for a budget), then put items in
+  it by using the slot's name as the keyword: `hat fedora "Fedora" logic+1`.
+  Filling a slot swaps out the longest-worn piece, and slots can be declared
+  above or below the items that use them.
+- The gear panel is now EQUIPMENT, grouped by slot, each with a worn/limit tally.
+
+**Stats & money**
+
+- A stat can be a gauge: `stat resolve = 3 max 5` draws filled/empty pips under
+  its label, and the value clamps at the cap (the floor stays open, so an
+  `@fail` on `<= 0` still fires). Good for vitals like health, resolve, or water.
+- Currency is money: it shows as a float (`340.00`) at the foot of the sidebar,
+  so it reads as cash whatever you name it.
+- The sidebar now runs STATUS, SKILLS, EQUIPMENT, ITEMS, and money, top to
+  bottom.
+
+**Reading**
+
+- Already-read lines shrink as they recede without the text rewrapping, so a
+  long passage no longer reflows while it shrinks.
+
+**Publishing**
+
+- Published games are now pinned to the engine version they were made under.
+  When andstar updates, a game you already shared keeps the exact look and
+  behavior it had at publish time; only republishing moves it to the current
+  engine. So everything above is safe to ship without disturbing the back
+  catalog.
+
+The demo, rebuilt as "Two Wings Good," shows all of it.
+
 ## 0.3.0
 
 Reading settings. A settings button in the header (play pages and the editor

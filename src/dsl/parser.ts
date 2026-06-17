@@ -8,6 +8,10 @@ import { parseExpr, collectRefs } from "./expr";
 
 const IDENT = /^[A-Za-z_]\w*$/;
 
+// Declaration keywords a slot's name may not shadow — otherwise `skill foo`
+// could mean either a skill or an item in a slot called "skill".
+const RESERVED = new Set(["skill", "char", "item", "currency", "var", "stat", "slot"]);
+
 // skill/char/item declarations share this shape:
 //   kw id "Display Name" ...rest    (quotes optional for one-word names)
 function parseDecl(rest: string): { id: string; name: string; tail: string } | null {
@@ -44,6 +48,7 @@ export function parseGame(source: string): ParseResult {
     skills: {},
     chars: {},
     items: {},
+    slots: {},
     vars: {},
     stats: [],
     passages: {},
@@ -58,6 +63,9 @@ export function parseGame(source: string): ParseResult {
 
   // Deferred validation: expressions/targets checked after all declarations are known.
   const exprRefs: { line: number; idents: Set<string>; items: Set<string> }[] = [];
+  // Declaration lines whose leading word matched no fixed keyword. Resolved
+  // after the full pass, so an item can name a slot declared above OR below it.
+  const pendingDecls: { ln: number; decl: string }[] = [];
   const targetRefs: { line: number; target: string }[] = [];
 
   const parseCondOrNull = (src: string, line: number) => {
@@ -71,6 +79,25 @@ export function parseGame(source: string): ParseResult {
       err(line, `bad expression "${src}": ${(ex as Error).message}`);
       return null;
     }
+  };
+
+  // Declare an item, optionally into an equipment slot. Shared by the bare
+  // `item` keyword (slotless) and the slot-as-keyword form (`tool torch "..."`).
+  const declareItem = (rest: string, slot: string | undefined, ln: number): void => {
+    const d = parseDecl(rest);
+    if (!d) { err(ln, `bad item declaration — expected: item id "Name" skill+1 other-1`); return; }
+    const mods: Record<string, number> = {};
+    for (const part of d.tail ? d.tail.split(/\s+/) : []) {
+      const pm = part.match(/^([A-Za-z_]\w*)([+-]\d+)$/);
+      if (!pm) { err(ln, `bad item modifier "${part}" — expected like logic+1`); return; }
+      mods[pm[1].toLowerCase()] = parseInt(pm[2], 10);
+    }
+    if (game.items[d.id]) { err(ln, `item "${d.id}" is already declared`); return; }
+    if (slot && Object.keys(mods).length === 0) {
+      err(ln, `item "${d.id}" is in slot "${slot}" but has no skill modifiers — only equippable items take a slot`);
+      return;
+    }
+    game.items[d.id] = { id: d.id, name: d.name, mods, slot };
   };
 
   for (let i = 0; i < lines.length; i++) {
@@ -149,8 +176,11 @@ export function parseGame(source: string): ParseResult {
         if (cm) color = cm[0];
         const bm = d.tail.match(/=\s*(-?\d+)/);
         if (bm) base = parseInt(bm[1], 10);
+        // An optional quoted blurb (the name was already consumed by parseDecl).
+        const sd = d.tail.match(/"([^"]*)"/);
+        const desc = sd ? sd[1] : undefined;
         if (game.skills[d.id] || game.chars[d.id]) { err(ln, `"${d.id}" is already declared`); continue; }
-        game.skills[d.id] = { id: d.id, name: d.name, color, base };
+        game.skills[d.id] = { id: d.id, name: d.name, color, base, desc };
         continue;
       }
 
@@ -163,23 +193,22 @@ export function parseGame(source: string): ParseResult {
         continue;
       }
 
-      if ((m = decl.match(/^item\s+(.*)$/))) {
-        const d = parseDecl(m[1]);
-        if (!d) { err(ln, `bad item declaration — expected: item id "Name" skill+1 other-1`); continue; }
-        const mods: Record<string, number> = {};
-        let ok = true;
-        if (d.tail) {
-          for (const part of d.tail.split(/\s+/)) {
-            const pm = part.match(/^([A-Za-z_]\w*)([+-]\d+)$/);
-            if (!pm) { err(ln, `bad item modifier "${part}" — expected like logic+1`); ok = false; break; }
-            mods[pm[1].toLowerCase()] = parseInt(pm[2], 10);
-          }
-        }
-        if (!ok) continue;
-        if (game.items[d.id]) { err(ln, `item "${d.id}" is already declared`); continue; }
-        game.items[d.id] = { id: d.id, name: d.name, mods };
+      if (/^slot\b/.test(decl)) {
+        // The "= N" limit is optional and defaults to 1 — most slots hold one thing.
+        const sm = decl.match(/^slot\s+([A-Za-z_]\w*)\s*(?:"([^"]*)")?\s*(?:=\s*(\d+))?\s*$/);
+        if (!sm) { err(ln, `bad slot declaration — expected: slot hat "Headwear" = 1 (the "= 1" is optional)`); continue; }
+        const id = sm[1].toLowerCase();
+        if (RESERVED.has(id)) { err(ln, `slot "${id}" collides with a reserved keyword — choose another name`); continue; }
+        const limit = sm[3] ? parseInt(sm[3], 10) : 1;
+        if (limit < 1) { err(ln, `slot "${id}" limit must be at least 1`); continue; }
+        if (game.slots[id]) { err(ln, `slot "${id}" is already declared`); continue; }
+        game.slots[id] = { id, name: sm[2] ?? id[0].toUpperCase() + id.slice(1), limit };
         continue;
       }
+
+      // `item foo "Foo" mods` declares a slotless item; an item in a slot uses
+      // the slot's name as the keyword (`tool torch "..."`) and is resolved below.
+      if ((m = decl.match(/^item\s+(.*)$/))) { declareItem(m[1], undefined, ln); continue; }
 
       if ((m = decl.match(/^currency\s+(.*)$/))) {
         const d = parseDecl(m[1]);
@@ -196,19 +225,29 @@ export function parseGame(source: string): ParseResult {
       }
 
       if ((m = decl.match(/^(var|stat)\s+([A-Za-z_]\w*)\s*=\s*(.+)$/))) {
-        const kind = m[1], name = m[2].toLowerCase(), lit = m[3].trim();
+        const kind = m[1], name = m[2].toLowerCase();
+        let lit = m[3].trim();
+        // A stat may cap its HUD gauge with a trailing "max N".
+        let statMax: number | undefined;
+        if (kind === "stat") {
+          const mm = lit.match(/^(.*?)\s+max\s+(\d+)\s*$/);
+          if (mm) { lit = mm[1].trim(); statMax = parseInt(mm[2], 10); }
+        }
         let v: Value;
         if (/^-?\d+(\.\d+)?$/.test(lit)) v = parseFloat(lit);
         else if (lit === "true" || lit === "false") v = lit === "true";
         else if (/^"[^"]*"$/.test(lit)) v = lit.slice(1, -1);
         else { err(ln, `${kind} value must be a number, true/false, or "string"`); continue; }
+        if (statMax !== undefined && typeof v !== "number") { err(ln, `stat "${name}" has a max but its starting value isn't a number`); continue; }
         if (name in game.vars || game.skills[name]) { err(ln, `"${name}" is already declared`); continue; }
-        game.vars[name] = v;
-        if (kind === "stat") game.stats.push(name);
+        game.vars[name] = statMax !== undefined && typeof v === "number" ? Math.min(v, statMax) : v;
+        if (kind === "stat") game.stats.push({ name, max: statMax });
         continue;
       }
 
-      err(ln, `expected a declaration (@title, skill, char, item, var, stat) or a passage (== name)`);
+      // Unrecognized leading word: might be `<slot> <item> ...` for a slot
+      // declared elsewhere. Defer it; resolved once every slot is known.
+      pendingDecls.push({ ln, decl });
       continue;
     }
 
@@ -337,8 +376,10 @@ export function parseGame(source: string): ParseResult {
         const name = m[1].toLowerCase();
         exprRefs.push({ line: ln, idents: new Set([name]), items: new Set() });
         effect = { kind: "set", name, expr: e };
-      } else if ((m = body.match(/^(give|take|equip|unequip)\s+([A-Za-z_]\w*)\s*$/))) {
-        effect = { kind: m[1] as "give", item: m[2].toLowerCase() };
+      } else if ((m = body.match(/^(give|take|equip|unequip)\s+([A-Za-z_]\w*)(?:\s+(\d+))?\s*$/))) {
+        // give/take may carry a count ("~ give water 3"); equip/unequip ignore it.
+        const amount = m[3] ? parseInt(m[3], 10) : undefined;
+        effect = { kind: m[1] as "give", item: m[2].toLowerCase(), amount };
         exprRefs.push({ line: ln, idents: new Set(), items: new Set([effect.item]) });
       } else if ((m = body.match(/^wardrobe\s+(open|close)\s*$/))) {
         effect = { kind: "wardrobe", open: m[1] === "open" };
@@ -381,6 +422,20 @@ export function parseGame(source: string): ParseResult {
     passage.steps.push({ kind: "say", speaker: "", text: content.startsWith("|") ? content.slice(1).trim() : content, ...gate });
   }
 
+  // Resolve deferred declarations now that every slot is known: a leading word
+  // naming a declared slot is an item in that slot; anything else is an error.
+  for (const { ln, decl } of pendingDecls) {
+    const dm = decl.match(/^([A-Za-z_]\w*)\s+(.+)$/);
+    const kw = dm?.[1].toLowerCase();
+    if (kw && game.slots[kw]) {
+      declareItem(dm![2], kw, ln);
+    } else if (kw && !RESERVED.has(kw)) {
+      err(ln, `unknown declaration "${dm![1]}" — if "${kw}" is an equipment slot, declare it first: slot ${kw}`);
+    } else {
+      err(ln, `expected a declaration (@title, skill, char, item, slot, var, stat) or a passage (== name)`);
+    }
+  }
+
   // --- whole-document validation ---
   if (explicitStart) game.start = explicitStart;
   if (!game.start) err(0, "no passages defined — add one with: == start");
@@ -400,9 +455,22 @@ export function parseGame(source: string): ParseResult {
       if (!game.items[it]) err(ref.line, `unknown item "${it}"`);
     }
   }
+  // Split each item's modifiers: those targeting a skill stay as equipment mods
+  // (worn), those targeting a stat/var become consumable effects (clicked to use).
   for (const item of Object.values(game.items)) {
-    for (const sk of Object.keys(item.mods)) {
-      if (!game.skills[sk]) err(0, `item "${item.id}" modifies unknown skill "${sk}"`);
+    const consumable: Record<string, number> = {};
+    for (const target of Object.keys(item.mods)) {
+      if (game.skills[target]) continue; // equipment mod
+      if (target in game.vars) { consumable[target] = item.mods[target]; delete item.mods[target]; continue; }
+      err(0, `item "${item.id}" modifies "${target}", which is not a declared skill or stat`);
+    }
+    if (Object.keys(consumable).length) {
+      if (Object.keys(item.mods).length) {
+        err(0, `item "${item.id}" mixes skill modifiers (equipment) and stat changes (a consumable) — make it one or the other`);
+      } else {
+        item.consumable = consumable;
+        if (item.slot) err(0, `item "${item.id}" changes a stat, so it's a consumable and can't go in an equipment slot`);
+      }
     }
   }
 
@@ -466,8 +534,13 @@ export function parseGame(source: string): ParseResult {
   for (const it of Object.values(game.items)) {
     if (!usedItems.has(it.id)) warnings.push({ line: 0, message: `item "${it.id}" is declared but never given, equipped, or checked` });
   }
+  for (const slot of Object.values(game.slots)) {
+    if (!Object.values(game.items).some((it) => it.slot === slot.id)) {
+      warnings.push({ line: 0, message: `slot "${slot.id}" is declared but no item belongs to it` });
+    }
+  }
   for (const name of Object.keys(game.vars)) {
-    if (game.stats.includes(name) || game.currency?.id === name) continue;
+    if (game.stats.some((s) => s.name === name) || game.currency?.id === name) continue;
     if (!usedIdents.has(name)) warnings.push({ line: 0, message: `var "${name}" is declared but never used` });
   }
 

@@ -1,0 +1,1 @@
+import"./modulepreload-polyfill-B5Qt9EMX.js";/* empty css               */document.getElementById("privacy-btn").addEventListener("click",e=>{e.target.hidden=!0;const t=document.getElementById("privacy-text");t.hidden=!1,t.classList.add("show")});

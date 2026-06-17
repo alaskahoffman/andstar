@@ -21,6 +21,8 @@ export interface SkillDef {
   name: string;
   color: string;
   base: number;
+  /** Optional blurb shown on the character/level-up screen and as a tooltip. */
+  desc?: string;
 }
 
 export interface CharDef {
@@ -29,10 +31,26 @@ export interface CharDef {
   color: string;
 }
 
+export interface StatDef {
+  name: string; // a var, surfaced in the HUD
+  /** When set, the HUD shows the value as filled/empty pips up to this cap. */
+  max?: number;
+}
+
 export interface ItemDef {
   id: string;
   name: string;
-  mods: Record<string, number>; // skill id -> modifier
+  mods: Record<string, number>; // skill id -> modifier (equipment, applied while worn)
+  /** stat/var id -> delta applied once when the reader clicks to use it (then one is
+   *  consumed). An item modifies skills (equipment) OR stats (consumable), not both. */
+  consumable?: Record<string, number>;
+  slot?: string; // equipment slot id; limits how many can be worn at once
+}
+
+export interface SlotDef {
+  id: string;
+  name: string;
+  limit: number; // max items from this slot equipped at once (>= 1)
 }
 
 export type CheckType = "white" | "red";
@@ -60,7 +78,7 @@ export interface Choice {
 
 export type Effect =
   | { kind: "set"; name: string; expr: Expr }
-  | { kind: "give" | "take" | "equip" | "unequip"; item: string }
+  | { kind: "give" | "take" | "equip" | "unequip"; item: string; amount?: number }
   | { kind: "wardrobe"; open: boolean }
   | { kind: "pay" | "earn"; expr: Expr }
   | { kind: "save" }
@@ -115,8 +133,10 @@ export interface GameDef {
   skills: Record<string, SkillDef>;
   chars: Record<string, CharDef>;
   items: Record<string, ItemDef>;
+  /** Equipment slots: each caps how many of its items can be worn at once. */
+  slots: Record<string, SlotDef>;
   vars: Record<string, Value>;
-  stats: string[]; // var names shown in the HUD, in order
+  stats: StatDef[]; // vars surfaced in the HUD, in order
   passages: Record<string, Passage>;
 }
 

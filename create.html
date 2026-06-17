@@ -69,12 +69,17 @@
 @accent #e94560                     # accent color
 @font serif                         # book (default), mono, serif, sans, humanist
 skill logic "Logic" #6cb9ff = 3     # speaking voice + rollable, starts at 3
+skill logic "Logic" #6cb9ff = 3 "What it is"  # optional blurb on the character screen
 char kim "Kim" #f0c987              # a character
-item flask "Hip Flask" gut+2 logic-1  # equipment with skill modifiers
-item page "Torn Page"               # no modifiers = plain possession (no equip box)
-currency real "Réal" = 20           # money, shown in the HUD
+item flask "Hip Flask" gut+2 logic-1  # skill modifier = equipment (worn)
+item cup "Cup of Water" health+1    # stat modifier = consumable (click to use)
+item page "Torn Page"               # no modifier = key item (just carried)
+slot hat "Headwear"             # an equipment slot; limit defaults to 1 (a swap-slot), = N for a budget
+hat fedora "Fedora" logic+1         # use the slot name as the keyword to put an item in it
+currency real "Réal" = 20           # money: shown as a float (20.00) at the foot of the sidebar
 var seen_body = false               # hidden variable
-stat morale = 2                     # variable shown in the sidebar HUD</pre>
+stat morale = 2                     # a number in the STATUS panel
+stat resolve = 3 max 5              # add "max N" to draw it as a 5-pip gauge, capped at 5</pre>
             <h4>Passages</h4>
             <pre>== start                  # defines a passage; the first one starts the game
 Plain text is narration.
@@ -82,7 +87,7 @@ kim: "Dialogue is speaker-id, colon, text."
 logic: Skills can speak too — they render in italics, in their color.
 ? perception 8: A passive check — only shown if Perception total ≥ 8.
 ~ set morale = morale - 1   # effects: set / give / take / equip / unequip
-~ give flask
+~ give flask 3              # items stack; ~ take flask removes one ([has(flask)] = any left)
 ~ pay 20                    # spend currency (~ earn 5 to gain); gate with [real >= 20]
 ~ wardrobe open             # allow equipping here (~ wardrobe close to lock)
 ~ points 1                  # grant skill points; the player allocates immediately

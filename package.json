@@ -1,7 +1,7 @@
 {
   "name": "andstar",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -11,6 +11,7 @@
     "dev": "vite",
     "server": "node --no-warnings server/index.mjs",
     "build": "vite build && vite build --config vite.standalone.config.ts",
+    "freeze": "vite build --config vite.freeze.config.ts",
     "check": "tsc --noEmit",
     "smoke": "vite-node scripts/smoke.ts",
     "start": "node --no-warnings server/index.mjs"

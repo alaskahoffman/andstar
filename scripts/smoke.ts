@@ -86,7 +86,7 @@ console.log("\nmechanics:");
 {
   const rt = new Runtime(game, { rng: () => 0.0 });
   const inv = rt.getInventory();
-  assert(inv.find((i) => i.id === "jacket")?.equipped, "jacket given and equipped on start (~ equip)");
+  assert(inv.find((i) => i.id === "flying")?.equipped, "jacket given and equipped on start (~ equip)");
   const before = rt.effectiveSkill("senses"); // base 3
   rt.toggleEquip("torch");
   assert(rt.effectiveSkill("senses") === before + 2, "equipping the torch buffs senses by +2");
@@ -94,20 +94,19 @@ console.log("\nmechanics:");
   assert(rt.effectiveSkill("senses") === before, "unequip restores total");
   assert(rt.effectiveSkill("hands") === 2, "equipped jacket debuffs the hands (3 - 1)");
 
-  // Passives: senses 6 (the exhaust flame) needs total >= 6; base is 3.
+  // Passives: senses 4 (the exhaust flame) needs total >= 4; base is 3.
   assert(!rt.log.some((l) => l.kind === "passive"), "senses passive hidden at low skill");
   const g2 = structuredClone(game);
   g2.skills.senses.base = 10;
   const rt2 = new Runtime(g2, { rng: () => 0.0 });
   assert(rt2.log.some((l) => l.kind === "passive"), "passive fires at high skill");
 
-  // Dawn conditionals: orange/chart/heart choices hidden without their flags,
-  // and drinking is visible but locked with the thermos still in the wreck.
+  // Dawn conditionals: orange/chart/heart hidden without their flags, and the
+  // drink is hidden while water sits at 0 (it's a [water >= 1] gate now).
   const rtS = new Runtime(game, { rng: () => 0.0, startAt: "dawn" });
   const dawnChoices = rtS.getChoices();
-  assert(dawnChoices.length === 4, "orange/chart/heart choices hidden without their flags");
-  const drink = dawnChoices.find((c) => c.cost?.kind === "pay")!;
-  assert(drink.cost!.locked, "drinking greyed out with zero cups of water");
+  assert(dawnChoices.length === 3, "orange/chart/heart/drink choices hidden without water or their flags");
+  assert(!dawnChoices.some((c) => c.text.startsWith("Drink")), "drinking hidden with zero water");
 
   // White checks lock on failure until the skill ITSELF is upgraded;
   // equipment affects rolls but cannot reopen a failed check. Red is one-shot.
@@ -148,6 +147,98 @@ item lens "Lens" a+1
   rt3.choose(rt3.getChoices().find((c) => c.check?.type === "red")!.id); // fail red
   cs = rt3.getChoices();
   assert(!cs.some((c) => c.check?.type === "red"), "red gone after one attempt");
+}
+
+console.log("\nequipment slots (single & budget):");
+{
+  const pg = parseGame(`
+skill a "A" = 0
+slot hat "Headwear" = 1
+slot charm "Charms" = 2
+hat   fedora "Fedora" a+1
+hat   cap    "Cap" a+2
+charm ring   "Ring" a+1
+charm pin    "Pin" a+1
+charm bead   "Bead" a+1
+item  torch  "Torch" a+1
+== start
+~ give fedora
+~ give cap
+~ give ring
+~ give pin
+~ give bead
+~ give torch
+~ wardrobe open
+* wait -> start
+`);
+  assert(pg.errors.length === 0, "slot game compiles clean");
+  const cg = pg.game!;
+  assert(cg.slots.hat?.limit === 1 && cg.slots.charm?.limit === 2, "slot limits parsed");
+  assert(cg.slots.hat?.name === "Headwear", "slot display name parsed");
+  assert(cg.items.fedora.slot === "hat", "slot-keyword puts the item in its slot");
+  assert(cg.items.torch.slot === undefined, "plain item has no slot");
+
+  const rt = new Runtime(cg, { rng: () => 0.5 });
+  // Slot (limit 1): equipping a second hat swaps the first one out.
+  rt.toggleEquip("fedora");
+  assert(rt.effectiveSkill("a") === 1, "fedora equipped (+1)");
+  rt.toggleEquip("cap");
+  assert(rt.effectiveSkill("a") === 2, "equipping the cap swapped out the fedora (slot of 1)");
+  const hats = rt.getInventory().filter((i) => i.slot === "hat" && i.equipped);
+  assert(hats.length === 1 && hats[0].id === "cap", "exactly one hat worn, the newest");
+
+  // Budget (limit 2): the third charm evicts the one equipped longest ago.
+  rt.toggleEquip("ring");
+  rt.toggleEquip("pin");
+  rt.toggleEquip("bead");
+  const charms = rt.getInventory().filter((i) => i.slot === "charm" && i.equipped).map((i) => i.id);
+  assert(charms.length === 2, "charm budget capped at 2");
+  assert(!charms.includes("ring") && charms.includes("pin") && charms.includes("bead"), "oldest charm (ring) evicted");
+
+  // Untagged items ignore caps entirely.
+  rt.toggleEquip("torch");
+  assert(rt.getInventory().find((i) => i.id === "torch")?.equipped, "slotless item equips freely");
+
+  // The ~ equip effect honors the cap too.
+  const eg = parseGame(`
+skill a "A" = 0
+slot hat "Hat" = 1
+hat h1 "H1" a+1
+hat h2 "H2" a+2
+== start
+~ equip h1
+~ equip h2
+* wait -> start
+`).game!;
+  const eqHats = new Runtime(eg, { rng: () => 0.5 }).getInventory().filter((i) => i.equipped).map((i) => i.id);
+  assert(eqHats.length === 1 && eqHats[0] === "h2", "~ equip respects the slot limit (h2 swapped in)");
+
+  // A slot can be declared AFTER the items that use it (order-independent).
+  const reordered = parseGame(`skill a "A"\nhat x "X" a+1\nslot hat "H"\n== s\n* w -> s\n`).game!;
+  assert(reordered.items.x?.slot === "hat", "slot may be declared after the items that use it");
+
+  // Errors and warnings around slots.
+  const unknown = parseGame(`skill a "A"\nnope x "X" a+1\n== s\n* w -> s\n`);
+  assert(unknown.errors.some((e) => e.message.includes('unknown declaration "nope"')), "unknown slot keyword errors");
+  const noMods = parseGame(`slot hat "Hat" = 1\nhat x "X"\n== s\n* w -> s\n`);
+  assert(noMods.errors.some((e) => e.message.includes("no skill modifiers")), "slotted item needs modifiers");
+  const badLimit = parseGame(`slot hat "Hat" = 0\n== s\n* w -> s\n`);
+  assert(badLimit.errors.some((e) => e.message.includes("at least 1")), "limit below 1 rejected");
+  const reserved = parseGame(`slot item "Items"\n== s\n* w -> s\n`);
+  assert(reserved.errors.some((e) => e.message.includes("reserved keyword")), "slot can't shadow a reserved keyword");
+  const unused = parseGame(`skill a "A"\nslot hat "Hat" = 1\n== s\n* w -> s\n`);
+  assert(unused.warnings.some((w) => w.message.includes('slot "hat" is declared but no item')), "unused slot warned");
+
+  // The "= N" limit is optional and defaults to 1 (the common single-item slot).
+  const defaulted = parseGame(`skill a "A"\nslot hat "Headwear"\nslot ring\nhat h "H" a+1\nring r "R" a+1\n== s\n* w -> s\n`).game!;
+  assert(defaulted.slots.hat.limit === 1, "omitted limit defaults to 1");
+  assert(defaulted.slots.ring.limit === 1 && defaulted.slots.ring.name === "Ring", "bare slot gets default name + limit 1");
+
+  // Sample game wiring: one slot per kind, each defaulting to limit 1.
+  assert(game!.slots.jacket?.limit === 1 && game!.slots.tool?.limit === 1 && game!.slots.accessory?.limit === 1,
+    "sample kind-slots present (jacket/tool/accessory, default limit 1)");
+  assert(game!.items.flying.slot === "jacket" && game!.items.torch.slot === "tool" && game!.items.scarf.slot === "accessory",
+    "sample items declared via their slot keyword");
 }
 
 console.log("\nsave checkpoints (~ save):");
@@ -208,7 +299,7 @@ skill b "B" = 1
   const rtP = new Runtime(pg, { rng: () => 0.0 });
   assert(rtP.pendingPoints === 2, "~ points 2 grants 2 pending points");
   assert(rtP.log.some((l) => l.kind === "system" && l.text === "+2 skill points"), "grant logged");
-  assert(!rtP.allocatePoints({ a: 1 }), "partial allocation rejected");
+  assert(!rtP.allocatePoints({ a: 3 }), "over-allocation rejected");
   assert(!rtP.allocatePoints({ a: 3, b: -1 }), "negative allocation rejected");
   assert(rtP.allocatePoints({ a: 2, b: 0 }), "exact allocation accepted");
   assert(rtP.skillBase("a") === 3 && rtP.pendingPoints === 0, "points applied to base");
@@ -398,11 +489,20 @@ console.log("\nplaytest start override:");
 
 console.log("\nbuild points & wardrobe:");
 {
-  assert(game.points?.pool === 4 && game.points?.max === 6, "@points 4 max 6 parsed");
+  assert(game.points?.pool === 2 && game.points?.max === undefined, "@points 2 parsed (no explicit max)");
+  assert(parseGame(`@points 4 max 6\n== s\nhi\n* x -> END\n`).game!.points?.max === 6, "@points max override parsed");
 
-  // Build overrides replace skill bases.
-  const rtB = new Runtime(game, { rng: () => 0.5, build: { hands: 6, reckoning: 3, sangfroid: 2, senses: 3, heart: 2 } });
-  assert(rtB.skillBase("hands") === 6, "build allocation applied to skill base");
+  // Skill descriptions: optional quoted blurb after the base.
+  assert(game.skills.sangfroid.desc?.startsWith("Cold blood"), "sample skill carries a description");
+  const sd = parseGame(`skill a "A" #6cb9ff = 3 "the blurb"\n== s\nhi\n* x -> END\n`);
+  assert(sd.errors.length === 0 && sd.game!.skills.a.desc === "the blurb", "skill description parsed");
+  assert(parseGame(`skill a "A" = 3\n== s\nhi\n* x -> END\n`).game!.skills.a.desc === undefined, "description optional");
+
+  // Build overrides replace skill bases — including pulled BELOW base (min-max,
+  // floored at 1 on the build screen).
+  const rtB = new Runtime(game, { rng: () => 0.5, build: { hands: 9, reckoning: 3, sangfroid: 1, senses: 3, heart: 2 } });
+  assert(rtB.skillBase("hands") === 9, "build allocation applied to skill base");
+  assert(rtB.skillBase("sangfroid") === 1, "a skill pulled below its baseline takes effect");
 
   // Wardrobe: locked by default, opened/closed by effects.
   const wg = parseGame(`
@@ -476,9 +576,114 @@ console.log("\ntheme directives:");
   assert(says.kind === "say" && says.text === "Case #4 begins today.", "# kept verbatim inside passage text");
 }
 
+console.log("\nstats (HUD gauges):");
+{
+  // The sample's resolve carries a max, so the HUD draws it as a 5-pip gauge.
+  assert(game.stats.find((s) => s.name === "resolve")?.max === 5, "sample 'resolve' stat capped at max 5");
+
+  const sg = parseGame(`stat hp = 3 max 5\nstat gold = 10\n== s\n* w -> s\n`).game!;
+  assert(sg.stats.find((s) => s.name === "hp")?.max === 5, "stat max parsed");
+  assert(sg.stats.find((s) => s.name === "gold")?.max === undefined, "stat without max stays a plain number");
+
+  const bad = parseGame(`stat label = "hi" max 5\n== s\n* w -> s\n`);
+  assert(bad.errors.some((e) => e.message.includes("isn't a number")), "max on a non-numeric stat rejected");
+
+  // A capped stat clamps to its max, on both the initial value and every ~ set.
+  const over = parseGame(`stat hp = 9 max 5\n== s\n~ set hp = hp + 10\n* w -> s\n`).game!;
+  assert(new Runtime(over, { rng: () => 0.5 }).statValue("hp") === 5, "initial above max and ~ set both clamp to the cap");
+  const under = parseGame(`stat hp = 2 max 5\n== s\n~ set hp = hp - 10\n* w -> s\n`).game!;
+  assert(new Runtime(under, { rng: () => 0.5 }).statValue("hp") === -8, "the floor is free, so @fail can still see <= 0");
+
+  // The sample's water is now a survival stat (capped at 3 cups), not currency.
+  assert(game.stats.find((s) => s.name === "water")?.max === 3, "sample water is a stat (max 3)");
+}
+
+console.log("\nstackable & consumable items:");
+{
+  const sg = parseGame(`
+stat thirst = 1 max 3
+item water "Water"
+== start
+~ give water 3
+~ wardrobe open
+-> hub
+== hub
+You carry {has(water)} cups.
+* [has(water)] drink -> drink
+* [has(water) > 1] more than one -> hub
+* wait -> hub
+== drink
+~ take water
+~ set thirst = thirst + 1
+~ save
+-> hub
+`).game!;
+  let snap: import("../src/engine/runtime").SaveData | null = null;
+  const rt = new Runtime(sg, { rng: () => 0.5, onSave: (s) => { snap = s; } });
+  const count = (r: Runtime) => r.getInventory().find((i) => i.id === "water")?.count ?? 0;
+  assert(count(rt) === 3, "~ give item N stacks to N");
+  assert(rt.getChoices().some((c) => c.text === "drink"), "consume choice shown while items remain");
+  // has(item) is the count: a bare gate stays truthy, while comparisons and
+  // {interpolation} see the number — no second keyword to learn.
+  assert(rt.log.some((l) => "text" in l && l.text === "You carry 3 cups."), "{has(item)} interpolates the count");
+  assert(rt.getChoices().some((c) => c.text === "more than one"), "[has(item) > 1] open while 3 are held");
+
+  rt.choose(rt.getChoices().find((c) => c.text === "drink")!.id); // 3 -> 2, thirst 1 -> 2, save
+  assert(count(rt) === 2, "~ take removes exactly one");
+  assert(rt.statValue("thirst") === 2, "consuming applied its effect (thirst 1 -> 2)");
+  assert(snap !== null && count(new Runtime(sg, { rng: () => 0.5, restore: snap! })) === 2, "item counts survive save/restore");
+
+  rt.choose(rt.getChoices().find((c) => c.text === "drink")!.id); // 2 -> 1
+  assert(!rt.getChoices().some((c) => c.text === "more than one"), "[has(item) > 1] closes at 1 (bare [has] would still pass)");
+  rt.choose(rt.getChoices().find((c) => c.text === "drink")!.id); // 1 -> 0, gone
+  assert(count(rt) === 0 && !rt.getInventory().some((i) => i.id === "water"), "the last one taken removes the item");
+  assert(!rt.getChoices().some((c) => c.text === "drink"), "consume choice hidden once empty");
+
+  // Sample wiring: the cup is a stackable consumable that feeds the water vital.
+  assert(game.items.cup?.consumable?.water === 1, "sample cup is a consumable (water+1)");
+}
+
+console.log("\nconsumable items (click to use):");
+{
+  const cg = parseGame(`
+skill grit "Grit" = 3
+stat thirst = 1 max 3
+item cup "Cup" thirst+1
+item jacket "Jacket" grit+1
+item rock "Rock"
+== start
+~ give cup 2
+* w -> start
+`).game!;
+  assert(cg.items.cup.consumable?.thirst === 1 && Object.keys(cg.items.cup.mods).length === 0, "a stat modifier makes a consumable, not equipment");
+  assert(Object.keys(cg.items.jacket.mods).length === 1 && !cg.items.jacket.consumable, "a skill modifier stays equipment");
+  assert(!cg.items.rock.consumable && Object.keys(cg.items.rock.mods).length === 0, "no modifier stays a plain possession");
+
+  const rt = new Runtime(cg, { rng: () => 0.5 });
+  const cups = () => rt.getInventory().find((i) => i.id === "cup")?.count ?? 0;
+  assert(rt.getInventory().find((i) => i.id === "cup")?.consumable?.thirst === 1, "inventory exposes the consumable effect");
+  rt.useItem("cup");
+  assert(rt.statValue("thirst") === 2 && cups() === 1, "using applies the effect and spends exactly one");
+  rt.useItem("cup");
+  assert(rt.statValue("thirst") === 3 && cups() === 0, "second use applies again and empties the stack");
+  rt.useItem("cup"); // none left
+  assert(cups() === 0, "using with none left is a safe no-op");
+
+  // A capped stat clamps on use, just like ~ set.
+  const clampG = parseGame(`stat hp = 4 max 5\nitem potion "Potion" hp+10\n== s\n~ give potion\n* w -> s\n`).game!;
+  const cr = new Runtime(clampG, { rng: () => 0.5 });
+  cr.useItem("potion");
+  assert(cr.statValue("hp") === 5, "a consumable can't push a capped stat past its max");
+
+  // Errors: unknown target, mixing equipment + consumable, consumable in a slot.
+  assert(parseGame(`item x "X" zzz+1\n== s\n* w -> s\n`).errors.some((e) => e.message.includes("not a declared skill or stat")), "unknown modifier target errors");
+  assert(parseGame(`skill a "A" = 1\nstat hp = 1\nitem x "X" a+1 hp+1\n== s\n* w -> s\n`).errors.some((e) => e.message.includes("mixes skill modifiers")), "mixing equipment + consumable errors");
+  assert(parseGame(`stat hp = 1\nslot pouch\npouch x "X" hp+1\n== s\n* w -> s\n`).errors.some((e) => e.message.includes("can't go in an equipment slot")), "a consumable can't be slotted");
+}
+
 console.log("\ncurrency & plain items:");
 {
-  assert(game.currency?.id === "water" && game.currency?.name === "Water (cups)", "sample declares currency (water)");
+  assert(game.currency?.id === "franc" && game.currency?.name === "Francs", "sample declares currency (francs)");
 
   const cg = parseGame(`
 currency gold "Gold" = 10
@@ -506,7 +711,7 @@ skill gold_sense "Gold Sense" = 2
   assert(!rtC.getInventory().find((i) => i.id === "key")!.equipped, "plain possessions cannot be equipped");
   rtC.choose(rtC.getChoices()[0].id); // gold >= 12 visible, spend
   assert(rtC.statValue("gold") === 3, "~ pay subtracts (15 - 12)");
-  assert(rtC.log.some((l) => l.kind === "system" && l.text === "−12 Gold"), "pay logged");
+  assert(rtC.log.some((l) => l.kind === "system" && l.text === "−12.00 Gold"), "pay logged (float)");
 
   const noCur = parseGame(`== s\n~ pay 5\n* x -> END\n`);
   assert(noCur.errors.some((e) => e.message.includes("needs a currency")), "~ pay without currency rejected");
@@ -544,7 +749,7 @@ currency gold "Gold" = 10
   assert(!pcs.find((c) => c.cost?.kind === "pay")!.cost!.locked, "pay choice unlocks once affordable");
   rtPC.choose(pcs.find((c) => c.cost?.kind === "pay")!.id);
   assert(rtPC.statValue("gold") === 0 && rtPC.ended, "[pay 15] deducted and choice navigated");
-  assert(rtPC.log.some((l) => l.kind === "system" && l.text === "−15 Gold"), "payment logged");
+  assert(rtPC.log.some((l) => l.kind === "system" && l.text === "−15.00 Gold"), "payment logged (float)");
 
   assert(
     parseGame(`== s\n* [pay 5] x -> END\n`).errors.some((e) => e.message.includes("needs a currency")),

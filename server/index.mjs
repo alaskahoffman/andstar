@@ -4,12 +4,15 @@
 import express from "express";
 import { DatabaseSync } from "node:sqlite";
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const dist = join(root, "..", "dist");
+// The engine version newly published games are stamped with. Drives version
+// pinning: a published game always plays on the engine it was made under.
+const ENGINE_VERSION = JSON.parse(readFileSync(join(root, "..", "package.json"), "utf8")).version;
 // Point DATA_DIR at a persistent disk in production (e.g. /var/data on Render).
 const dataDir = process.env.DATA_DIR || join(root, "..", "data");
 mkdirSync(dataDir, { recursive: true });
@@ -23,16 +26,22 @@ db.exec(`
     source     TEXT NOT NULL,
     edit_key   TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    version    TEXT NOT NULL DEFAULT '0.3.0'
   )
 `);
+// Migrate databases that predate pinning: add the column, defaulting existing
+// rows to 0.3.0 (the last release before games carried a version).
+try { db.exec("ALTER TABLE games ADD COLUMN version TEXT NOT NULL DEFAULT '0.3.0'"); } catch { /* column already present */ }
 
 const insertGame = db.prepare(
-  "INSERT INTO games (id, title, author, source, edit_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  "INSERT INTO games (id, title, author, source, edit_key, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 );
 const getGame = db.prepare("SELECT * FROM games WHERE id = ?");
+// Republishing re-stamps to the current engine: you're editing on today's editor,
+// so what you see there is what goes live.
 const updateGame = db.prepare(
-  "UPDATE games SET title = ?, author = ?, source = ?, updated_at = ? WHERE id = ?",
+  "UPDATE games SET title = ?, author = ?, source = ?, updated_at = ?, version = ? WHERE id = ?",
 );
 const deleteGame = db.prepare("DELETE FROM games WHERE id = ?");
 
@@ -89,7 +98,7 @@ app.post("/api/games", rateLimit("create", 20, 3_600_000), (req, res) => {
   const id = newId();
   const editKey = randomBytes(18).toString("base64url");
   const now = new Date().toISOString();
-  insertGame.run(id, req.body.title.slice(0, 200), String(req.body.author ?? "").slice(0, 200), req.body.source, editKey, now, now);
+  insertGame.run(id, req.body.title.slice(0, 200), String(req.body.author ?? "").slice(0, 200), req.body.source, editKey, now, now, ENGINE_VERSION);
   res.status(201).json({ id, editKey });
 });
 
@@ -101,7 +110,7 @@ app.put("/api/games/:id", rateLimit("update", 120, 3_600_000), (req, res) => {
   if (typeof req.body.editKey !== "string" || req.body.editKey !== row.edit_key) {
     return res.status(403).json({ error: "wrong edit key" });
   }
-  updateGame.run(req.body.title.slice(0, 200), String(req.body.author ?? "").slice(0, 200), req.body.source, new Date().toISOString(), req.params.id);
+  updateGame.run(req.body.title.slice(0, 200), String(req.body.author ?? "").slice(0, 200), req.body.source, new Date().toISOString(), ENGINE_VERSION, req.params.id);
   res.json({ id: req.params.id, ok: true });
 });
 
@@ -126,6 +135,7 @@ app.get("/api/games/:id", (req, res) => {
     author: row.author,
     source: row.source,
     updated_at: row.updated_at,
+    version: row.version,
   });
 });
 
@@ -147,24 +157,32 @@ app.get("/", (req, res) => {
   res.send(html.replace('content="/og.png"', `content="${ogImage(req)}"`));
 });
 
+const frozenDir = join(root, "..", "frozen");
+
 app.get("/play/:id", (req, res) => {
-  let template;
-  try {
-    template = readFileSync(join(dist, "play.html"), "utf8");
-  } catch {
-    return res.status(503).send("frontend not built — run: npm run build");
-  }
   let title = "andstar";
   let desc = "an interactive dialogue game";
+  let version = null; // the demo and unknown ids ride the current player
   if (req.params.id === "demo") {
-    title = "Dead Reckoning";
+    title = "Two Wings Good";
     desc = "the andstar demo: the night mail goes down in the desert, 1935";
   } else {
     const row = getGame.get(req.params.id);
     if (row) {
       title = row.title;
       if (row.author) desc = `a dialogue game by ${row.author}`;
+      version = row.version;
     }
+  }
+  // Version pinning: serve the frozen player the game was published under, so the
+  // engine moving on never restyles or re-behaves an old game. Fall back to the
+  // current build when that version was never frozen (e.g. before its snapshot).
+  const frozenPage = version ? join(frozenDir, version, "play.html") : null;
+  let template;
+  try {
+    template = readFileSync(frozenPage && existsSync(frozenPage) ? frozenPage : join(dist, "play.html"), "utf8");
+  } catch {
+    return res.status(503).send("frontend not built — run: npm run build");
   }
   const head = [
     `<title>${escapeHtml(title)} — andstar</title>`,
@@ -180,6 +198,8 @@ app.get("/play/:id", (req, res) => {
 app.get("/create", (_req, res) => res.sendFile(join(dist, "create.html")));
 app.get("/docs", (_req, res) => res.sendFile(join(dist, "docs.html")));
 
+// Frozen per-version player bundles (immutable; committed). /v/0.4.0/assets/… etc.
+app.use("/v", express.static(frozenDir, { immutable: true, maxAge: "1y" }));
 app.use(express.static(dist));
 
 app.use((_req, res) => {

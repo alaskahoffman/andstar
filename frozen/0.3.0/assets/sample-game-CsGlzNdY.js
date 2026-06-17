@@ -1,24 +1,19 @@
-// Default editor content: a short scene that demonstrates every DSL feature.
-
-export const SAMPLE_GAME = `# ============================================================
-#  TWO WINGS GOOD, a sample game
+const e=`# ============================================================
+#  DEAD RECKONING, a sample game
 #  The night mail goes down in the desert, 1935.
 #  Lines starting with # are comments.
 # ============================================================
 
-@title Two Wings Good
-@author Alaska Hoffman, Fable
+@title Dead Reckoning
+@author Fable
 
-# Use @points to give readers extra skillpoints to distribute before the game starts.
-# Skills can range from 1 to 9 (add "max 6" to lower the ceiling to 6).
-@points 2
+# Players distribute 4 extra points before the game starts (max 6 per skill).
+@points 4 max 6
 
 # --- fail state --------------------------------------------------
-# Set the condition for a reader to get sent back to the last save
-# Optionally, a special fail state message can be given.
-# A choice can also fail directly without a condition with: -> FAIL
-@fail resolve <= 0 "The sand is soft as snow, and warm. You lie down in it the way men lie down in snow. Your journey goes no further."
-@fail water <= 0 "Past thirst there is a dryness that forgets it was ever wet, and a calm that comes with it. You sit down to wait it out. Your journey goes no further."
+# When this becomes true the run fails and the player returns to the
+# last ~ save checkpoint. A choice can also fail directly with: -> FAIL
+@fail resolve <= 0 "The sand is soft as snow, and warm. You lie down in it the way men lie down in snow."
 
 # --- looks (optional) --------------------------------------------
 # Uncomment to restyle the player. Shades are derived from @bg.
@@ -27,62 +22,36 @@ export const SAMPLE_GAME = `# ==================================================
 # @font serif      # book (default), mono, serif, sans, humanist
 # @reveal paced   # line pacing: click (default), paced, off
 
-# --- skills: id "Name" #color = starting value "description" -----
-# Skills can SPEAK in dialogue, gate passive interjections, and be
-# rolled in white/red checks.
+# --- skills: id "Name" #color = starting value -------------------
+# Skills can SPEAK in dialogue, gate passive interjections,
+# and be rolled in white/red checks.
 
-skill hands     "Grit"   #d98b6a = 3 "Where mind and soul fail, the body will persevere and the hands will guide."
-skill reckoning "Reckoning"   #6cb9ff = 3 "The mathematics that separate ground below and sky above."
-skill sangfroid "Sang-Froid"  #8fb3a8 = 3 "Cold blood. Slow is smooth, smooth is fast."
-skill senses    "Reflexiveness"  #a8c97f = 3 "The hair on back of the neck, reading your instruments without seeing them."
-skill heart     "The Heart"   #c79ddb = 3 "What you have left when every other tank is empty. Faith, stupidity, luck, whatever you want to call it."
+skill hands     "The Hands"   #d98b6a = 3
+skill reckoning "Reckoning"   #6cb9ff = 3
+skill sangfroid "Sang-Froid"  #8fb3a8 = 2
+skill senses    "The Senses"  #a8c97f = 3
+skill heart     "The Heart"   #c79ddb = 2
 
 # --- characters ---------------------------------------------------
 
 char marchand "Marchand" #f0c987
 
-# --- items & equipment ---------------------------------------------
-# An item's modifier decides its kind. A SKILL modifier makes EQUIPMENT, worn
-# from the wardrobe. A STAT modifier (like water+1) makes a CONSUMABLE the reader
-# clicks to use, spending one. No modifier makes a KEY ITEM you just carry (a
-# chart, a letter); has(item) still gates on it.
-# item id "Name" modifier+/-value
-#
-# A slot is a category of equipment that caps how many of that kind you can
-# wear at once. Use the slot's name as the keyword to put items in it, just like "item".
-# Limit defaults to 1 (one jacket, one hat); add "= N" for a kind you
-# can stack, e.g. slot ring "Rings" = 10.
+# --- items ---------------------------------------------------------
+# Items with skill modifiers are equipment. Players can equip and
+# unequip them whenever the wardrobe is open. Items WITHOUT modifiers
+# are plain possessions: no equip box, but has(item) still works.
 
-item      orange "Orange"
-item      chart  "Soaked Chart"
-item      cup    "Cup of Water" water+1
+item jacket "Flying Jacket"  sangfroid+1 hands-1
+item torch  "Electric Torch" senses+2
+item scarf  "Silk Scarf"     heart+1
+item orange "One Orange"
+item chart  "Soaked Chart"
 
-slot jacket
-slot tool
-slot accessory
+# --- currency & state ----------------------------------------------
+# Currency doesn't have to be money. Out here it is water.
 
-jacket    flying "Flying Jacket"   sangfroid+1 hands-1
-tool      torch  "Electric Torch"  senses+2
-accessory scarf  "Silk Scarf"      heart+1
-
-# --- stats, money & state ------------------------------------------
-# A stat is a number the player watches, like health. Give it "max N" and the HUD
-# draws it as a row of filled/empty pips.
-#
-# A currency shows as a float at the foot of the sidebar,
-# so it reads as cash whatever you call it, real, dollars, etc.
-#
-# States allow you to set up special gates for whether or not dialogue and passages can
-# be triggered. In this demo, a variable "knows_drift" is set false so that later, if
-# a player accesses a certain passage, it can flip true and they'll get a unique
-# dialogue or textbox that reflects this. You can set a var anywhere, but this is a good
-# place to keep them all together and organized.
-
-stat resolve = 3 max 5
-stat water = 3 max 3
-
-currency franc "Francs" = 0
-
+currency water "Water (cups)" = 0
+stat resolve = 3
 var knows_drift = false
 
 # ===================================================================
@@ -91,14 +60,15 @@ var knows_drift = false
 
 == start
 Four hours out, southbound with the mail in the dark. The moon went down behind you like a coal sinking in water, and now the cloud has closed beneath the plane like a second sea.
-~ give flying
-~ equip flying
+~ give jacket
+~ equip jacket
 ~ give torch
 ~ give scarf
 ~ give orange
 ~ wardrobe open
 marchand: He leans forward from the dark behind you and shouts over the engine: "Cigarette?" He is not afraid. He has decided not to be.
-? senses 4: The exhaust flame is running long and orange. Headwind, or tailwind. The engine knows something about the air that the charts do not.
+? senses 6: The exhaust flame is running long and orange. Headwind, or tailwind. The engine knows something about the air that the charts do not.
+Your gear is in the sidebar. What you carry on your body changes what you can do.
 * Climb, and look for a star to steer by -> climb
 * Hold low, under the cloud, and trust the sand to stay where it was -> low
 * [white reckoning 10] Run the dead reckoning again, wind and hours and drift, in your head -> drift_yes | drift_no
@@ -147,17 +117,15 @@ The desert at night is black sand under black sky, with a line of stars where th
 ? senses 7: Petrol, but faint, and fading. She didn't burn. Whatever is in the tanks and the thermos is still yours.
 * [once] Go through the wreck by feel, pocket by pocket, locker by locker -> salvage
 * [white senses 9] Quarter the ground around the wreck with the torch -> found_chart | found_nothing
-* [has(cup)] Drink. One cup. Make it last a hundred small swallows. -> drink_night
+* [pay 1] Drink. One cup. Make it last a hundred small swallows. -> drink_night
 * [once] Sit with Marchand against the warm side of the engine -> marchand_talk
 * Walk out now, into the dark, while the walking is cool -> night_walk
 * Wait for dawn -> dawn
 
 == salvage
-~ give cup 2
-~ earn 340
-The thermos lives. Two cups of water gone lukewarm, which out here is treasure. Also: a handful of grapes gone to raisins in their bag, and the first-aid kit, crushed flat.
+~ earn 2
+The thermos lives. Two cups of coffee gone lukewarm, which out here is treasure. Also: a handful of grapes gone to raisins in their bag, and the first-aid kit, crushed flat.
 sangfroid: Two cups. Say it plainly and do not say it again.
-And folded in your breast pocket, forgotten until your hand finds it: a month of pay in francs, soft and warm from your body, and out here not the price of one swallow.
 -> wreck
 
 == found_chart
@@ -171,9 +139,7 @@ senses: Nothing out here but geology and you.
 -> wreck
 
 == drink_night
-~ take cup
-The water is cold and tastes faintly of the thermos cork, and it is the finest thing you have ever drunk.
-~ set water = water + 1
+The coffee is cold and tastes faintly of the thermos cork, and it is the finest thing you have ever drunk.
 ~ set resolve = resolve + 1
 -> wreck
 
@@ -185,7 +151,6 @@ heart: He is building you a rope out of nothing, and handing you one end of it.
 -> wreck
 
 == night_walk
-~ set water = water - 1
 You walk. Within twenty steps the wreck has vanished behind you; within a hundred, every direction is the same direction.
 * [red sangfroid 11] Hold a star on your shoulder and your panic at arm's length -> circled | oh_no
 * Keep walking. Any direction is a decision. -> oh_no
@@ -201,21 +166,19 @@ The night closes over your tracks behind you, quietly, the way water does.
 -> FAIL
 
 == dawn
-[once] ~ set water = water - 1
 Dawn comes the color of iron, then of fire. The country shows itself at last: a plateau of black pebbles to every horizon, perfectly clean, perfectly empty, like the floor of a sea that gave up the sea.
 [once] marchand: Marchand stands very still, looking at all of it. "Right," he says finally, as if agreeing to terms.
 ? senses 8: There, on the wing fabric: a grey sheen. Dew. The desert sweats at dawn, for an hour, for those who notice.
-* [once] Wring the dew out of the wing fabric, rag by rag -> dew
+* [once] [earn 1] Wring the dew out of the wing fabric, rag by rag -> dew
 * [once] [has(orange)] Eat the orange, slowly, formally, a ceremony in two acts -> orange_rite
-* [has(cup)] Drink. One cup against the whole of the day. -> drink_dawn
+* [pay 1] Drink. One cup against the whole of the day. -> drink_dawn
 * [white reckoning 9] Walk east-northeast, by the sun and the map in your head -> walk_end | wrong_way
 * [has(chart)] Follow the chart's one legible corner -> walk_end
 * [heart >= 5] Walk toward the thing that is not quite hope, but is shaped like it -> heart_end
 * Stay with her. At dusk, burn a wing: petrol and fabric, a signature in smoke. -> stay_end
 
 == dew
-~ give cup 1
-Half a cup of water that tastes of dope and varnish and aluminum. You catch the airplane's sweat and are grateful to her.
+Half a cup of water that tastes of dope and varnish and aluminum. You drink the airplane's sweat and are grateful to her.
 -> dawn
 
 == orange_rite
@@ -226,21 +189,18 @@ heart: Remember this. Whatever happens after, you were given an orange in the de
 -> dawn
 
 == drink_dawn
-~ take cup
 One cup. You hold each swallow against the roof of your mouth until it disappears on its own.
-~ set water = water + 1
 ~ set resolve = resolve + 1
 -> dawn
 
 == wrong_way
-~ set water = water - 1
 Two hours out, the sun swings wrong across your shoulders. The map in your head has a fold in it somewhere. You correct, walking your doubt back to the wreck in a long shamed curve.
 ~ set resolve = resolve - 1
 reckoning: East-northeast. You drifted with your feet exactly as you drifted with your wings.
 -> dawn
 
 == walk_end
-You fill your pockets: raisins, the thermos with its {has(cup)} cups, the rags still damp with dew. And you walk, and the plateau lets you, one black pebble at a time.
+You fill your pockets: raisins, the thermos with its {water} cups, the rags still damp with dew. And you walk, and the plateau lets you, one black pebble at a time.
 THE LOGBOOK SAYS: YOU WALKED EAST. Somewhere ahead of you, days out, there is a rider on a camel who has already, without knowing it, begun to save your life.
 -> END
 
@@ -253,4 +213,4 @@ THE LOGBOOK SAYS: NOT HOPE, EXACTLY. But it walked like hope, and you walked beh
 All day you build the pyre on the wing and do not light it. At dusk you light it. The fabric goes up with a sound like an enormous page turning, and the smoke stands straight up in the dead evening air, a black line a hundred meters tall. It is the largest thing you have ever written.
 THE LOGBOOK SAYS: THE FIRE. If anyone is looking, they will see it. You sit with Marchand in the firelight and are, for one hour, the only lamp in a thousand square kilometers.
 -> END
-`;
+`;export{e as SAMPLE_GAME};

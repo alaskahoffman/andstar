@@ -107,14 +107,16 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     const skills = Object.values(game.skills);
     const alloc: Record<string, number> = {};
     const sig = buildSig(game);
+    // Build-screen skill range: a hard floor of 1, and a ceiling of the
+    // author's max if set, otherwise 9.
+    const FLOOR = 1;
+    const ceiling = points.max ?? 9;
+    const minAlloc = (s: typeof skills[number]) => FLOOR - s.base;
+    const maxAlloc = (s: typeof skills[number]) => ceiling - s.base;
     if (lastBuild && lastBuild.sig === sig) {
-      // Re-apply the previous allocation as far as the pool allows.
-      let left = points.pool;
+      // Restore the previous allocation, clamped to each skill's valid range.
       for (const s of skills) {
-        const want = Math.max(0, lastBuild.alloc[s.id] ?? 0);
-        const give = Math.min(want, left, points.max !== undefined ? points.max - s.base : want);
-        alloc[s.id] = Math.max(0, give);
-        left -= alloc[s.id];
+        alloc[s.id] = Math.max(minAlloc(s), Math.min(lastBuild.alloc[s.id] ?? 0, maxAlloc(s)));
       }
     } else {
       for (const s of skills) alloc[s.id] = 0;
@@ -126,9 +128,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       el(
         "p",
         "build-intro",
-        `Distribute ${points.pool} point${points.pool === 1 ? "" : "s"} among your skills${
-          points.max !== undefined ? ` (max ${points.max} per skill)` : ""
-        }.`,
+        `Distribute ${points.pool} point${points.pool === 1 ? "" : "s"} among your skills (max ${ceiling} each).`,
       ),
     );
     const rows = el("div", "build-rows");
@@ -142,23 +142,31 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     function redraw(): void {
       rows.innerHTML = "";
       for (const s of skills) {
+        const v = s.base + alloc[s.id];
         const row = el("div", "build-row");
+        const label = el("div", "build-label");
         const name = el("span", "build-name", s.name.toUpperCase());
         setInk(name, s.color);
+        label.append(name);
+        if (s.desc) label.append(el("span", "build-desc", s.desc));
+        const controls = el("div", "build-controls");
         const minus = el("button", "build-btn", "−") as HTMLButtonElement;
-        const value = el("span", "build-value", String(s.base + alloc[s.id]));
+        const value = el("span", "build-value", String(v));
         const plus = el("button", "build-btn", "+") as HTMLButtonElement;
-        minus.disabled = alloc[s.id] <= 0;
-        plus.disabled =
-          remaining() <= 0 || (points.max !== undefined && s.base + alloc[s.id] >= points.max);
-        minus.onclick = () => { alloc[s.id]--; redraw(); };
-        plus.onclick = () => { alloc[s.id]++; redraw(); };
-        row.append(name, minus, value, plus);
+        minus.disabled = v <= FLOOR;
+        plus.disabled = remaining() <= 0 || v >= ceiling;
+        minus.onclick = () => { if (v > FLOOR) { alloc[s.id]--; redraw(); } };
+        plus.onclick = () => { if (remaining() > 0 && v < ceiling) { alloc[s.id]++; redraw(); } };
+        controls.append(minus, value, plus);
+        row.append(label, controls);
         rows.append(row);
       }
       const r = remaining();
-      poolEl.textContent = r > 0 ? `${r} point${r === 1 ? "" : "s"} remaining` : "all points spent";
+      poolEl.textContent =
+        r > 0 ? `${r} point${r === 1 ? "" : "s"} remaining` : r < 0 ? `${-r} over budget` : "all points spent";
       poolEl.classList.toggle("pool-left", r > 0);
+      poolEl.classList.toggle("pool-over", r < 0);
+      begin.disabled = r < 0;
       begin.textContent = r > 0 ? `BEGIN (${r} unspent)` : "BEGIN";
     }
 
@@ -300,6 +308,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
   function renderAllocator(): void {
     const points = rt!.pendingPoints;
     const skills = Object.values(game.skills);
+    const ceiling = game.points?.max ?? 9; // same per-skill ceiling as the build screen
     const alloc: Record<string, number> = {};
     for (const s of skills) alloc[s.id] = 0;
     const box = el("div", "build levelup");
@@ -311,22 +320,30 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     function redraw(): void {
       rows.innerHTML = "";
       for (const s of skills) {
+        const v = rt!.skillBase(s.id) + alloc[s.id];
         const row = el("div", "build-row");
+        const label = el("div", "build-label");
         const name = el("span", "build-name", s.name.toUpperCase());
         setInk(name, s.color);
+        label.append(name);
+        const controls = el("div", "build-controls");
         const minus = el("button", "build-btn", "−") as HTMLButtonElement;
-        const value = el("span", "build-value", String(rt!.skillBase(s.id) + alloc[s.id]));
+        const value = el("span", "build-value", String(v));
         const plus = el("button", "build-btn", "+") as HTMLButtonElement;
         minus.disabled = alloc[s.id] <= 0;
-        plus.disabled = remaining() <= 0;
-        minus.onclick = () => { alloc[s.id]--; redraw(); };
-        plus.onclick = () => { alloc[s.id]++; redraw(); };
-        row.append(name, minus, value, plus);
+        plus.disabled = remaining() <= 0 || v >= ceiling;
+        minus.onclick = () => { if (alloc[s.id] > 0) { alloc[s.id]--; redraw(); } };
+        plus.onclick = () => { if (remaining() > 0 && v < ceiling) { alloc[s.id]++; redraw(); } };
+        controls.append(minus, value, plus);
+        row.append(label, controls);
         rows.append(row);
       }
       const r = remaining();
-      confirm.disabled = r > 0;
-      confirm.textContent = r > 0 ? `CONFIRM (${r} left to spend)` : "CONFIRM";
+      // If every skill is already at the ceiling there's nowhere to put the
+      // points — let the player confirm anyway rather than soft-lock.
+      const canSpend = skills.some((s) => rt!.skillBase(s.id) + alloc[s.id] < ceiling);
+      confirm.disabled = r > 0 && canSpend;
+      confirm.textContent = r > 0 && canSpend ? `CONFIRM (${r} left to spend)` : "CONFIRM";
     }
     confirm.onclick = () => {
       if (rt!.allocatePoints(alloc)) render();
@@ -366,7 +383,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       let locked = false;
       if (c.cost) {
         const sign = c.cost.kind === "pay" ? "−" : "+";
-        btn.append(el("span", "check-tag currency-tag", `[${sign}${c.cost.amount} ${c.cost.name.toUpperCase()}]`));
+        btn.append(el("span", "check-tag currency-tag", `[${sign}${c.cost.amount.toFixed(2)} ${c.cost.name.toUpperCase()}]`));
         locked = locked || c.cost.locked;
       }
       if (c.check) {
@@ -404,20 +421,26 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
   function renderSheet(): void {
     if (!rt) return;
     side.innerHTML = "";
-    if (game.stats.length || game.currency) {
+    if (game.stats.length) {
       side.append(el("h3", "", "STATUS"));
       const dl = el("div", "stat-list");
       for (const s of game.stats) {
-        const row = el("div", "stat-row");
-        row.append(el("span", "stat-name", s.toUpperCase()), el("span", "stat-val", String(rt.statValue(s))));
-        dl.append(row);
-      }
-      // money reads as an afterthought, not a vital sign — it goes last
-      if (game.currency) {
-        const row = el("div", "stat-row");
-        const name = el("span", "stat-name currency-name", game.currency.name.toUpperCase());
-        row.append(name, el("span", "stat-val", String(rt.statValue(game.currency.id))));
-        dl.append(row);
+        if (s.max && s.max > 0) {
+          // A capped stat reads as a gauge — filled pips for the value, empty to the
+          // cap — stacked under its label so a wide gauge never fights the sidebar.
+          const val = Math.max(0, Math.min(Number(rt.statValue(s.name)) || 0, s.max));
+          const gauge = el("div", "stat-gauge");
+          gauge.title = `${rt.statValue(s.name)} / ${s.max}`;
+          gauge.append(el("div", "stat-name", s.name.toUpperCase()));
+          const pips = el("div", "stat-pips");
+          for (let i = 0; i < s.max; i++) pips.append(el("span", i < val ? "pip on" : "pip off", i < val ? "◆" : "◇"));
+          gauge.append(pips);
+          dl.append(gauge);
+        } else {
+          const row = el("div", "stat-row");
+          row.append(el("span", "stat-name", s.name.toUpperCase()), el("span", "stat-val", String(rt.statValue(s.name))));
+          dl.append(row);
+        }
       }
       side.append(dl);
     }
@@ -427,6 +450,7 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       const dl = el("div", "stat-list");
       for (const s of skills) {
         const row = el("div", "stat-row");
+        if (s.desc) row.title = s.desc;
         const name = el("span", "stat-name", s.name.toUpperCase());
         setInk(name, s.color);
         const eff = rt.effectiveSkill(s.id);
@@ -440,15 +464,8 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     const inv = rt.getInventory();
     if (inv.length) {
       const unlocked = rt.wardrobeOpen;
-      side.append(el("h3", "", "INVENTORY"));
-      const dl = el("div", "stat-list");
-      for (const it of inv) {
-        if (!it.equippable) {
-          const row = el("div", "stat-row plain-item");
-          row.append(el("span", "stat-name", it.name));
-          dl.append(row);
-          continue;
-        }
+
+      const itemRow = (it: (typeof inv)[number]) => {
         const row = el("button", "stat-row item-row") as HTMLButtonElement;
         const modsTxt = Object.entries(it.mods)
           .map(([k, v]) => `${v > 0 ? "+" : ""}${v} ${game.skills[k]?.name ?? k}`)
@@ -456,15 +473,80 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
         row.disabled = !unlocked;
         if (unlocked) row.title = `${modsTxt} — click to ${it.equipped ? "unequip" : "equip"}`;
         row.append(
-          el("span", "stat-name", `${it.equipped ? "■" : "□"} ${it.name}`),
+          el("span", "stat-name", `${it.equipped ? "■" : "□"} ${it.name}${it.count > 1 ? ` ×${it.count}` : ""}`),
           el("span", "stat-val item-mods", modsTxt),
         );
         row.onclick = () => {
           rt!.toggleEquip(it.id);
           render();
         };
-        dl.append(row);
+        return row;
+      };
+
+      // EQUIPMENT: slotted items grouped by slot (each headed by a worn/limit
+      // tally so a full slot is legible), then any slotless equippable items.
+      const equippable = inv.filter((it) => it.equippable);
+      if (equippable.length) {
+        side.append(el("h3", "", "EQUIPMENT"));
+        const dl = el("div", "stat-list");
+        const grouped = new Set<string>();
+        for (const [slotId, def] of Object.entries(game.slots)) {
+          const members = equippable.filter((it) => it.slot === slotId);
+          if (!members.length) continue;
+          const worn = members.filter((it) => it.equipped).length;
+          const head = el("div", "slot-head");
+          head.append(el("span", "slot-name", def.name), el("span", "slot-fill", `${worn}/${def.limit}`));
+          dl.append(head);
+          for (const it of members) { dl.append(itemRow(it)); grouped.add(it.id); }
+        }
+        for (const it of equippable) {
+          if (!grouped.has(it.id)) dl.append(itemRow(it));
+        }
+        side.append(dl);
       }
+
+      // ITEMS: things that aren't worn. Consumables (clickable, actionable) always
+      // sit above key items (just carried); order within each group is preserved.
+      const carried = inv
+        .filter((it) => !it.equippable)
+        .sort((a, b) => Number(!a.consumable) - Number(!b.consumable));
+      if (carried.length) {
+        side.append(el("h3", "", "ITEMS"));
+        const dl = el("div", "stat-list");
+        for (const it of carried) {
+          const qty = it.count > 1 ? ` ×${it.count}` : "";
+          if (it.consumable) {
+            const fx = Object.entries(it.consumable)
+              .map(([k, v]) => `${v > 0 ? "+" : ""}${v} ${k[0].toUpperCase()}${k.slice(1)}`)
+              .join(", ");
+            const row = el("button", "stat-row item-row") as HTMLButtonElement;
+            row.title = `${fx} — click to use`;
+            row.append(
+              el("span", "stat-name", `${it.name}${qty}`),
+              el("span", "stat-val item-mods", fx),
+            );
+            row.onclick = () => { rt!.useItem(it.id); render(); };
+            dl.append(row);
+          } else {
+            const row = el("div", "stat-row plain-item");
+            row.append(el("span", "stat-name", it.name));
+            if (it.count > 1) row.append(el("span", "stat-val", qty.trim()));
+            dl.append(row);
+          }
+        }
+        side.append(dl);
+      }
+    }
+
+    // Currency lives at the foot of the sidebar, apart from the vital stats up top.
+    if (game.currency) {
+      const dl = el("div", "stat-list currency-block");
+      const row = el("div", "stat-row");
+      row.append(
+        el("span", "stat-name currency-name", game.currency.name.toUpperCase()),
+        el("span", "stat-val", Number(rt.statValue(game.currency.id)).toFixed(2)),
+      );
+      dl.append(row);
       side.append(dl);
     }
   }
@@ -497,11 +579,23 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     finishRender();
   }
 
-  // Everything above the newest line tints down — the bright edge is
-  // the reader's cursor.
+  // Read text recedes: it scales down (via CSS transform — no reflow, unlike
+  // animating font-size) and a matching negative margin lets the line below
+  // slide up to close the gap the scale leaves. PAST_SCALE must match the
+  // scale() in `.log p.past`.
+  const PAST_SCALE = 0.84;
+  function markPast(elm: Element | null): void {
+    if (!(elm instanceof HTMLElement) || elm.classList.contains("past")) return;
+    const mb = parseFloat(getComputedStyle(elm).marginBottom) || 0;
+    const lost = (1 - PAST_SCALE) * elm.offsetHeight;
+    elm.classList.add("past");
+    elm.style.marginBottom = `${mb - lost}px`;
+  }
+
+  // Everything above the newest line recedes — the bright edge is the cursor.
   function dimPast(): void {
     const kids = logEl.children;
-    for (let i = 0; i < kids.length - 1; i++) kids[i].classList.add("past");
+    for (let i = 0; i < kids.length - 1; i++) markPast(kids[i]);
   }
 
   // Lines that don't need a deliberate tap to advance past: the echo of the
@@ -511,8 +605,14 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
     return e.kind === "system" || (e.kind === "narration" && e.text.startsWith("» "));
   }
 
+  // How long an auto line lingers before the next reveals: bookkeeping notices
+  // flick by; the echo of your choice gets a beat to register.
+  function autoDelay(e: LogEntry): number {
+    return e.kind === "system" ? 250 : 750;
+  }
+
   function revealNode(entry: LogEntry): void {
-    logEl.lastElementChild?.classList.add("past");
+    markPast(logEl.lastElementChild);
     const p = renderLogEntry(entry);
     p.classList.add("reveal");
     logEl.append(p);
@@ -540,13 +640,13 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       return;
     }
     revealNode(e);
-    afterReveal(isAuto(e));
+    afterReveal(e);
   }
 
   // Auto lines (the choice echo, item/save notices) appear normally and then
-  // advance on their own about a second later — no jarring instant flash, no
-  // wasted tap. Real prose waits for a tap (in paced mode it too is timed).
-  function afterReveal(wasAuto: boolean): void {
+  // advance on their own — no jarring instant flash, no wasted tap. Real prose
+  // waits for a tap (in paced mode it too is timed).
+  function afterReveal(prev: LogEntry): void {
     if (!revealQueue.length) {
       revealing = false;
       clearRevealTimer();
@@ -554,12 +654,12 @@ export function mountPlayer(container: HTMLElement, game: GameDef, opts: MountOp
       return;
     }
     revealing = true;
-    if (revealMode === "paced") {
-      revealTimer = window.setTimeout(stepNext, wasAuto ? 650 : 1500);
-    } else if (wasAuto) {
-      revealTimer = window.setTimeout(stepNext, 950);
+    if (isAuto(prev)) {
+      revealTimer = window.setTimeout(stepNext, autoDelay(prev));
+    } else if (revealMode === "paced") {
+      revealTimer = window.setTimeout(stepNext, 1500); // paced: prose on a timer too
     } else {
-      showContinueHint();
+      showContinueHint(); // click: prose waits for a tap
     }
   }
 

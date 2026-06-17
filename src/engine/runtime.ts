@@ -64,7 +64,7 @@ export interface SaveData {
   v: 1;
   at: { passage: string; step: number };
   vars: Record<string, Value>;
-  inventory: string[];
+  inventory: Record<string, number>; // item id -> count (older saves may be a string[])
   equipped: string[];
   firedPassives: string[];
   checkState: Record<string, CheckOutcome>;
@@ -126,7 +126,7 @@ export class Runtime {
   pendingPoints = 0;
 
   private vars = new Map<string, Value>();
-  private inventory = new Set<string>();
+  private inventory = new Map<string, number>(); // item id -> count held
   private equipped = new Set<string>();
   private firedPassives = new Set<string>();
   private firedOnce = new Set<string>(); // [once] lines, keyed passage#step
@@ -151,7 +151,10 @@ export class Runtime {
     if (opts.restore) {
       const snap = opts.restore;
       this.vars = new Map(Object.entries(snap.vars));
-      this.inventory = new Set(snap.inventory);
+      // Older saves stored inventory as a string[] (each item count 1).
+      this.inventory = Array.isArray(snap.inventory)
+        ? new Map((snap.inventory as string[]).map((id) => [id, 1]))
+        : new Map(Object.entries(snap.inventory));
       this.equipped = new Set(snap.equipped);
       this.firedPassives = new Set(snap.firedPassives);
       this.firedOnce = new Set(snap.firedOnce ?? []);
@@ -256,7 +259,9 @@ export class Runtime {
   /** Spend all pending skill points. alloc maps skill id -> points to add. */
   allocatePoints(alloc: Record<string, number>): boolean {
     const total = Object.values(alloc).reduce((a, b) => a + b, 0);
-    if (total !== this.pendingPoints) return false;
+    // Can't overspend; spending fewer than granted forfeits the rest (only
+    // reachable when every skill is already at its ceiling).
+    if (total > this.pendingPoints) return false;
     for (const [id, n] of Object.entries(alloc)) {
       if (n < 0 || !this.game.skills[id]) return false;
     }
@@ -283,15 +288,19 @@ export class Runtime {
     return this.vars.get(name) ?? 0;
   }
 
-  getInventory(): { id: string; name: string; equipped: boolean; equippable: boolean; mods: Record<string, number> }[] {
-    return [...this.inventory].map((id) => {
-      const mods = this.game.items[id]?.mods ?? {};
+  getInventory(): { id: string; name: string; count: number; equipped: boolean; equippable: boolean; mods: Record<string, number>; consumable?: Record<string, number>; slot?: string }[] {
+    return [...this.inventory].map(([id, count]) => {
+      const def = this.game.items[id];
+      const mods = def?.mods ?? {};
       return {
         id,
-        name: this.game.items[id]?.name ?? id,
+        name: def?.name ?? id,
+        count,
         equipped: this.equipped.has(id),
         equippable: Object.keys(mods).length > 0,
         mods,
+        consumable: def?.consumable,
+        slot: def?.slot,
       };
     });
   }
@@ -300,7 +309,41 @@ export class Runtime {
     if (!this.wardrobeOpen || !this.inventory.has(itemId)) return;
     if (Object.keys(this.game.items[itemId]?.mods ?? {}).length === 0) return; // plain possession
     if (this.equipped.has(itemId)) this.equipped.delete(itemId);
-    else this.equipped.add(itemId);
+    else this.equipItem(itemId);
+  }
+
+  // Use a consumable: apply its stat changes (clamped at a capped stat's max),
+  // spend one, and re-check fail rules. Allowed any time — it touches stats, not
+  // the skills a roll depends on, so it can't be used to game a check.
+  useItem(itemId: string): void {
+    const def = this.game.items[itemId];
+    if (!def?.consumable || (this.inventory.get(itemId) ?? 0) <= 0) return;
+    for (const [target, delta] of Object.entries(def.consumable)) {
+      let v = Number(this.vars.get(target) ?? 0) + delta;
+      const cap = this.game.stats.find((s) => s.name === target)?.max;
+      if (cap !== undefined && v > cap) v = cap;
+      this.vars.set(target, v);
+    }
+    const left = this.inventory.get(itemId)! - 1;
+    if (left > 0) this.inventory.set(itemId, left);
+    else this.inventory.delete(itemId);
+    this.log.push({ kind: "system", text: `Used ${def.name}` });
+    this.checkFailRules();
+  }
+
+  // Equip an item, honoring its slot limit. A slot caps how many of its items
+  // may be worn at once; equipping into a full one evicts the item equipped
+  // longest ago (Set iterates in insertion order), so a limit-1 slot acts as a
+  // swap and a limit-N slot as a budget you rotate through.
+  private equipItem(itemId: string): void {
+    if (this.equipped.has(itemId)) return;
+    const slot = this.game.items[itemId]?.slot;
+    const limit = slot ? this.game.slots[slot]?.limit : undefined;
+    if (slot && limit) {
+      const worn = [...this.equipped].filter((id) => this.game.items[id]?.slot === slot);
+      while (worn.length >= limit) this.equipped.delete(worn.shift()!);
+    }
+    this.equipped.add(itemId);
   }
 
   // ---- internals ----
@@ -403,27 +446,42 @@ export class Runtime {
 
   private applyEffect(e: Effect): void {
     switch (e.kind) {
-      case "set":
-        this.vars.set(e.name, this.evalExpr(e.expr));
+      case "set": {
+        let v = this.evalExpr(e.expr);
+        // A capped stat never rises above its max (the floor is free, so @fail
+        // rules that watch for <= 0 still fire).
+        const cap = this.game.stats.find((s) => s.name === e.name)?.max;
+        if (cap !== undefined && typeof v === "number" && v > cap) v = cap;
+        this.vars.set(e.name, v);
         break;
-      case "give":
-        if (!this.inventory.has(e.item)) {
-          this.inventory.add(e.item);
-          this.log.push({ kind: "system", text: `Item acquired: ${this.game.items[e.item]?.name ?? e.item}` });
-        }
+      }
         break;
-      case "take":
-        if (this.inventory.delete(e.item)) {
+      case "give": {
+        const n = e.amount ?? 1;
+        this.inventory.set(e.item, (this.inventory.get(e.item) ?? 0) + n);
+        const nm = this.game.items[e.item]?.name ?? e.item;
+        this.log.push({ kind: "system", text: `Item acquired: ${nm}${n > 1 ? ` ×${n}` : ""}` });
+        break;
+      }
+      case "take": {
+        const have = this.inventory.get(e.item) ?? 0;
+        if (have <= 0) break;
+        const left = have - (e.amount ?? 1);
+        if (left > 0) {
+          this.inventory.set(e.item, left); // still holding some — the sidebar count is the signal
+        } else {
+          this.inventory.delete(e.item);
           this.equipped.delete(e.item);
           this.log.push({ kind: "system", text: `Item lost: ${this.game.items[e.item]?.name ?? e.item}` });
         }
         break;
+      }
       case "equip":
         if (!this.inventory.has(e.item)) {
-          this.inventory.add(e.item);
+          this.inventory.set(e.item, 1);
           this.log.push({ kind: "system", text: `Item acquired: ${this.game.items[e.item]?.name ?? e.item}` });
         }
-        this.equipped.add(e.item);
+        this.equipItem(e.item);
         break;
       case "unequip":
         this.equipped.delete(e.item);
@@ -448,7 +506,7 @@ export class Runtime {
         const amt = Number(this.evalExpr(e.expr));
         const delta = e.kind === "pay" ? -amt : amt;
         this.vars.set(cur.id, Number(this.vars.get(cur.id) ?? 0) + delta);
-        this.log.push({ kind: "system", text: `${delta < 0 ? "−" : "+"}${Math.abs(amt)} ${cur.name}` });
+        this.log.push({ kind: "system", text: `${delta < 0 ? "−" : "+"}${Math.abs(amt).toFixed(2)} ${cur.name}` });
         break;
       }
       case "wardrobe":
@@ -480,7 +538,7 @@ export class Runtime {
       v: 1,
       at: { passage, step },
       vars: Object.fromEntries(this.vars),
-      inventory: [...this.inventory],
+      inventory: Object.fromEntries(this.inventory),
       equipped: [...this.equipped],
       firedPassives: [...this.firedPassives],
       checkState: Object.fromEntries(this.checkState),
@@ -540,7 +598,7 @@ export class Runtime {
       case "ident":
         if (this.game.skills[e.name]) return this.effectiveSkill(e.name);
         return this.vars.get(e.name) ?? 0;
-      case "has": return this.inventory.has(e.item);
+      case "has": return this.inventory.get(e.item) ?? 0; // the count held: truthy (>=1) in a bare gate, comparable/printable as a number
       case "un":
         return e.op === "not" ? !truthy(this.evalExpr(e.e)) : -Number(this.evalExpr(e.e));
       case "bin": {

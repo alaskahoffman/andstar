@@ -71,8 +71,8 @@ jekyll: "Ready?"
         <div class="doc-entry">
           <h3><code>@title</code> / <code>@author</code></h3>
           <p>Shown on the play page header and used for the share link preview.</p>
-          <pre>@title Dead Reckoning
-@author Fable</pre>
+          <pre>@title Two Wings Good
+@author Alaska Hoffman, Fable</pre>
         </div>
 
         <div class="doc-entry">
@@ -84,9 +84,11 @@ jekyll: "Ready?"
         <div class="doc-entry">
           <h3><code>@points</code></h3>
           <p>Shows a build screen before play: the player distributes this many extra
-          points on top of your declared skill values. <code>max</code> caps any one
-          skill at creation. Restarting returns to this screen. Without this line,
-          play begins immediately.</p>
+          points on top of your declared skill values, and can also pull a skill below
+          its starting value (down to zero) to spend those points elsewhere.
+          <code>max</code> caps any one skill at creation. Skill descriptions appear
+          here. Restarting returns to this screen. Without this line, play begins
+          immediately.</p>
           <pre>@points 4 max 6</pre>
         </div>
 
@@ -136,8 +138,10 @@ jekyll: "Ready?"
           <p>A skill is three things at once: a number the player can grow, a voice
           that can speak lines, and the thing dice checks roll against. The trailing
           number is its starting value (2 if omitted); the color is used wherever the
-          skill appears.</p>
-          <pre>skill sangfroid "Sang-Froid" #8fb3a8 = 2</pre>
+          skill appears. An optional quoted blurb at the end is shown on the character
+          screen (and as a sidebar tooltip), so players know what they're choosing.</p>
+          <pre>skill sangfroid "Sang-Froid" #8fb3a8 = 2
+skill sangfroid "Sang-Froid" #8fb3a8 = 2 "Cold blood. The discipline to do the slow thing while the world goes fast."</pre>
         </div>
 
         <div class="doc-entry">
@@ -153,29 +157,70 @@ char you "You" #e0d6c3</pre>
 
         <div class="doc-entry">
           <h3><code>item</code></h3>
-          <p>Items with skill modifiers are equipment: players can equip them when the
-          wardrobe is open, and the modifiers apply to every roll and total while
-          equipped. Items without modifiers are plain possessions: no equip box, but
-          <code>has(item)</code> still works in conditions.</p>
-          <pre>item jacket "Flying Jacket" sangfroid+1 hands-1
-item chart "Soaked Chart"</pre>
+          <p>What an item modifies decides which of three kinds it is:</p>
+          <ul>
+            <li><strong>Equipment</strong> — a <strong>skill</strong> modifier
+            (<code>sangfroid+1</code>). The player equips it from the wardrobe, and the
+            modifier applies to every roll and total while it is worn. With no slot it
+            stacks freely; a <code>slot</code> caps how many of a kind can be worn (see
+            below).</li>
+            <li><strong>Consumable</strong> — a <strong>stat</strong> modifier
+            (<code>water+1</code>). It sits under ITEMS with its effect shown, and the
+            reader can click it any time to apply the change and spend one.</li>
+            <li><strong>Key item</strong> — <strong>no</strong> modifier. A plain thing
+            you carry: nothing to wear or click, but <code>has(item)</code> still gates
+            on it (a chart, a letter, a key).</li>
+          </ul>
+          <p>An item is one kind, not a mix: equipment <em>or</em> a consumable, never
+          both. All three stack and can be given in quantity
+          (<code>~ give water 3</code>); <code>has(item)</code> reads as the count.</p>
+          <pre>item jacket "Flying Jacket" sangfroid+1 hands-1   # equipment (a skill)
+item cup "Cup of Water" water+1                  # consumable (a stat)
+item chart "Soaked Chart"                        # key item (no modifier)</pre>
+        </div>
+
+        <div class="doc-entry">
+          <h3><code>slot</code></h3>
+          <p>A slot is a kind of equipment, and it caps how many of that kind can be
+          worn at once, so gear forces a choice instead of stacking. Declare a slot
+          with an id, an optional display name, and an optional limit. Then put items
+          in it by using the slot's name as the keyword, exactly like <code>item</code>
+          but slotted.</p>
+          <p>The limit defaults to <strong>1</strong>: a slot that holds one thing, where
+          equipping a second item swaps the first out. Set a higher limit with
+          <code>= N</code> for a budget; once it is full, the next item you equip pushes
+          out the one you put on longest ago. Slots may be declared above or below the
+          items that use them, and each appears under EQUIPMENT in the sidebar with a
+          worn/limit tally.</p>
+          <pre>slot hat                  # one hat at a time (limit defaults to 1)
+slot charm "Charms" = 3   # a budget: wear any three
+
+hat   fedora "Felt Fedora" logic+1 esprit-1
+charm ring   "Brass Ring"  physique+1</pre>
         </div>
 
         <div class="doc-entry">
           <h3><code>currency</code></h3>
-          <p>One per game. Shows at the bottom of the player's status panel and powers
-          the <code>[pay]</code>/<code>[earn]</code> choice tags and
-          <code>~ pay</code>/<code>~ earn</code> effects. It behaves as a normal
-          variable in conditions. It does not have to be money.</p>
-          <pre>currency water "Water (cups)" = 0</pre>
+          <p>One per game: the player's money. It sits at the foot of the sidebar and
+          shows as a float (<code>340.00</code>) so it reads as cash whatever you name
+          it, and it powers the <code>[pay]</code>/<code>[earn]</code> choice tags and
+          <code>~ pay</code>/<code>~ earn</code> effects. It behaves as a normal variable
+          in conditions. For non-money resources like water, ammo, or morale, use a
+          <code>stat</code> instead.</p>
+          <pre>currency franc "Francs" = 0</pre>
         </div>
 
         <div class="doc-entry">
           <h3><code>var</code> / <code>stat</code></h3>
           <p>Both declare a named value: a number, <code>true</code>/<code>false</code>,
-          or a <code>"string"</code>. A <code>stat</code> additionally appears in the
-          player's status panel; a <code>var</code> is hidden bookkeeping.</p>
-          <pre>stat resolve = 3
+          or a <code>"string"</code>. A <code>stat</code> appears in the player's STATUS
+          panel; a <code>var</code> is hidden bookkeeping. Give a numeric stat
+          <code>max N</code> and the panel draws it as a row of filled/empty pips, a
+          gauge the player sweats toward zero; the value then clamps at that cap (the
+          floor stays open, so an <code>@fail</code> on <code>&lt;= 0</code> still
+          fires).</p>
+          <pre>stat resolve = 3 max 5   # a 5-pip gauge, capped at 5
+stat morale = 2          # a plain number
 var knows_drift = false</pre>
         </div>
       </section>
@@ -279,7 +324,7 @@ sangfroid: Say it plainly and do not say it again.</pre>
           and charges on selection. <code>[earn]</code> is the reverse. A cost and a
           check can share a choice; the cost applies on the attempt, then the dice
           decide.</p>
-          <pre>* [pay 1] Drink. One cup. -> drink
+          <pre>* [pay 20] Slip the guard a few notes -> through
 * [pay 5] [white sense 9] Ante up and read the table -> win | lose</pre>
         </div>
       </section>
@@ -301,17 +346,24 @@ sangfroid: Say it plainly and do not say it again.</pre>
           <h3><code>~ give / take / equip / unequip</code></h3>
           <p>Move items in and out of the player's possession. <code>give</code> and
           <code>take</code> announce themselves; <code>equip</code> also gives the item
-          if needed and puts it on regardless of the wardrobe state.</p>
-          <pre>~ give torch
-~ equip jacket
-~ take orange</pre>
+          if needed and puts it on regardless of the wardrobe state. If the item is in a
+          slot, equipping it obeys that slot's limit, swapping out the longest-worn piece
+          when the slot is full.</p>
+          <p>Items <strong>stack</strong>: <code>give</code>/<code>take</code> may carry a
+          count, the sidebar shows <code>×N</code>, and <code>has(item)</code> stays true
+          while any remain. That makes a <strong>consumable</strong> — a
+          <code>[has(water)]</code> choice that does <code>~ take water</code> plus
+          whatever the item should do (refill a stat, say).</p>
+          <pre>~ give water 3
+~ take water        # removes one; "Item lost" only when the last is gone
+~ equip jacket</pre>
         </div>
 
         <div class="doc-entry">
           <h3><code>~ pay / earn</code></h3>
           <p>Spend or gain currency, with a visible line. The amount can be an
           expression. Requires a declared currency.</p>
-          <pre>~ earn 2
+          <pre>~ earn 50
 ~ pay toll</pre>
         </div>
 
@@ -356,7 +408,9 @@ sangfroid: Say it plainly and do not say it again.</pre>
           <li>numbers, <code>true</code>/<code>false</code>, <code>"strings"</code></li>
           <li>any declared var, stat, or currency by name</li>
           <li>a skill name means its current total, including equipped items</li>
-          <li><code>has(item)</code> is true while the player holds the item</li>
+          <li><code>has(item)</code> is how many of it you hold: truthy in a bare gate
+          (<code>[has(cup)]</code>), or compared and printed as a number
+          (<code>[has(cup) &gt; 1]</code>, <code>{has(cup)}</code>)</li>
         </ul>
         <p>Inside narration, dialogue, or choice text, <code>{expression}</code> is
         replaced with its value. Braces that don't parse are left alone.</p>
@@ -425,6 +479,11 @@ You fill your pockets: raisins, the thermos with its {water} cups.</pre>
         <code>.txt</code>, back into the editor. The zip is also exactly what
         itch.io's "HTML project" upload wants, if you'd like to host or sell your
         game there.</p>
+        <p>A published game is <strong>pinned to the engine version</strong> it was
+        made under. When andstar updates, a game you already shared keeps the exact
+        look and behavior it had at publish time, so new features never disturb your
+        back catalog. Republishing moves it to the current engine (which is what you
+        see in the editor).</p>
         <p>What you publish stays yours. Stories are never used for AI training, sold,
         or mined for data.</p>
       </section>
